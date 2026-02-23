@@ -1,0 +1,65 @@
+#!/usr/bin/env bats
+
+setup() {
+  source "${BATS_TEST_DIRNAME}/../../scripts/lib/prefix.sh"
+}
+
+@test "build_site_url: プレフィックス付きURLを生成し末尾スラッシュを付与する" {
+  run build_site_url "examplestorage" "main"
+  [ "$status" -eq 0 ]
+  [ "$output" = "https://examplestorage.z22.web.core.windows.net/main/" ]
+}
+
+@test "build_site_url: prプレフィックスでも末尾スラッシュを付与する" {
+  run build_site_url "examplestorage" "pr-42"
+  [ "$status" -eq 0 ]
+  [ "$output" = "https://examplestorage.z22.web.core.windows.net/pr-42/" ]
+}
+
+@test "build_site_url: プレフィックス空文字ではルートURLを返す" {
+  run build_site_url "examplestorage" ""
+  [ "$status" -eq 0 ]
+  [ "$output" = "https://examplestorage.z22.web.core.windows.net/" ]
+}
+
+@test "build_site_url: プレフィックスがスラッシュのみでもルートURLを返す" {
+  run build_site_url "examplestorage" "/"
+  [ "$status" -eq 0 ]
+  [ "$output" = "https://examplestorage.z22.web.core.windows.net/" ]
+}
+
+@test "build_site_url: 前後スラッシュを正規化する" {
+  run build_site_url "examplestorage" "/preview/"
+  [ "$status" -eq 0 ]
+  [ "$output" = "https://examplestorage.z22.web.core.windows.net/preview/" ]
+}
+
+@test "build_blob_pattern: プレフィックス付きパターンを生成する" {
+  run build_blob_pattern "main"
+  [ "$status" -eq 0 ]
+  [ "$output" = "main/*" ]
+}
+
+@test "build_blob_pattern: prプレフィックスのパターンを生成する" {
+  run build_blob_pattern "pr-42"
+  [ "$status" -eq 0 ]
+  [ "$output" = "pr-42/*" ]
+}
+
+@test "build_blob_pattern: プレフィックス空文字では全件パターンを返す" {
+  run build_blob_pattern ""
+  [ "$status" -eq 0 ]
+  [ "$output" = "*" ]
+}
+
+@test "build_blob_pattern: プレフィックスがスラッシュのみでも全件パターンを返す" {
+  run build_blob_pattern "/"
+  [ "$status" -eq 0 ]
+  [ "$output" = "*" ]
+}
+
+@test "build_blob_pattern: 前後スラッシュを正規化する" {
+  run build_blob_pattern "/preview/"
+  [ "$status" -eq 0 ]
+  [ "$output" = "preview/*" ]
+}
