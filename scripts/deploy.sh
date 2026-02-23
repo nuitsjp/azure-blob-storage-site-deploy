@@ -20,6 +20,7 @@ deploy_main() {
   local source_dir="${2-${INPUT_SOURCE_DIR-}}"
   local target_prefix="${3-${INPUT_TARGET_PREFIX-}}"
   local action="${4-${INPUT_ACTION-deploy}}"
+  local static_website_endpoint="${5-${INPUT_STATIC_WEBSITE_ENDPOINT-}}"
   local blob_pattern
   local site_url
 
@@ -29,7 +30,11 @@ deploy_main() {
   validate_target_prefix "$target_prefix" || return 1
 
   blob_pattern="$(build_blob_pattern "$target_prefix")" || return 1
-  site_url="$(build_site_url "$storage_account" "$target_prefix")" || return 1
+  if [[ -n "$static_website_endpoint" ]]; then
+    site_url="$(build_site_url_from_endpoint "$static_website_endpoint" "$target_prefix")" || return 1
+  else
+    site_url="$(build_site_url "$storage_account" "$target_prefix")" || return 1
+  fi
 
   azure_delete_prefix "$storage_account" "$blob_pattern" || return 1
   azure_upload_dir "$storage_account" "$source_dir" "$target_prefix" || return 1

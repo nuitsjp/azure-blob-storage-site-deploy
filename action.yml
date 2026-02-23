@@ -11,24 +11,36 @@ inputs:
   target_prefix:
     description: "配置先プレフィックス（例: main, pr-42）"
     required: true
+  static_website_endpoint:
+    description: "静的WebサイトのベースURL（例: https://examplestorage.z11.web.core.windows.net）"
+    required: false
   action:
     description: 実行種別（deploy または cleanup）
     required: true
+
+outputs:
+  site_url:
+    description: deploy 成功時の配置先URL（末尾スラッシュ付き）
+    value: ${{ steps.deploy.outputs.site_url }}
 
 runs:
   using: composite
   steps:
     - name: deploy を実行
+      id: deploy
       if: ${{ inputs.action == 'deploy' }}
       shell: bash
       env:
         INPUT_STORAGE_ACCOUNT: ${{ inputs.storage_account }}
         INPUT_SOURCE_DIR: ${{ inputs.source_dir }}
         INPUT_TARGET_PREFIX: ${{ inputs.target_prefix }}
+        INPUT_STATIC_WEBSITE_ENDPOINT: ${{ inputs.static_website_endpoint }}
         INPUT_ACTION: ${{ inputs.action }}
       run: |
         set -euo pipefail
-        "${{ github.action_path }}/scripts/deploy.sh"
+        site_url="$("${{ github.action_path }}/scripts/deploy.sh")"
+        echo "site_url=${site_url}" >> "$GITHUB_OUTPUT"
+        printf '%s\n' "$site_url"
 
     - name: cleanup を実行
       if: ${{ inputs.action == 'cleanup' }}
