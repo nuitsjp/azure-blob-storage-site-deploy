@@ -34,6 +34,18 @@ setup() {
   [ "$output" = "https://examplestorage.z22.web.core.windows.net/preview/" ]
 }
 
+@test "build_site_url_from_endpoint: エンドポイントとプレフィックスからURLを生成する" {
+  run build_site_url_from_endpoint "https://examplestorage.z11.web.core.windows.net" "pr-42"
+  [ "$status" -eq 0 ]
+  [ "$output" = "https://examplestorage.z11.web.core.windows.net/pr-42/" ]
+}
+
+@test "build_site_url_from_endpoint: エンドポイント末尾スラッシュとプレフィックスを正規化する" {
+  run build_site_url_from_endpoint "https://examplestorage.z11.web.core.windows.net/" "/preview/"
+  [ "$status" -eq 0 ]
+  [ "$output" = "https://examplestorage.z11.web.core.windows.net/preview/" ]
+}
+
 @test "build_blob_pattern: プレフィックス付きパターンを生成する" {
   run build_blob_pattern "main"
   [ "$status" -eq 0 ]

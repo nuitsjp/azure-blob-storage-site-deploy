@@ -49,3 +49,12 @@ setup() {
 
   [ "$(mock_azure_call_count)" = "0" ]
 }
+
+@test "deploy_main: static_website_endpoint 指定時はそのURLを出力する" {
+  INPUT_STATIC_WEBSITE_ENDPOINT="https://examplestorage.z11.web.core.windows.net/" \
+    run deploy_main "examplestorage" "${TEST_SOURCE_DIR}" "pr-42"
+  [ "$status" -eq 0 ]
+  [ "$output" = "https://examplestorage.z11.web.core.windows.net/pr-42/" ]
+
+  [ "$(mock_azure_call_count)" = "2" ]
+}
