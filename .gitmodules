@@ -1,0 +1,3 @@
+[submodule "e2e"]
+	path = e2e
+	url = https://github.com/nuitsjp/azure-blob-storage-site-deploy-e2e.git
