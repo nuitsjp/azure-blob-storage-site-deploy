@@ -44,5 +44,6 @@ When implementation starts, follow `Architecture.md` for Bash script and Bats te
 ## Commit & Pull Request Guidelines
 - Follow the existing Conventional Commit style seen in history: `feat: ...`, `docs: ...`.
 - Japanese commit messages are acceptable and already used; prioritize clarity and scope.
+- 子IssueはPR作成・レビュー中の段階ではCloseしない。原則としてPRマージ後にCloseし、親Issueのチェックリストも同時に更新する。
 - PRs should include: purpose, changed files/areas, validation performed (commands run), and any architecture impact.
 - Link related issues/tasks when applicable, and note submodule updates explicitly if `e2e/` changes.
