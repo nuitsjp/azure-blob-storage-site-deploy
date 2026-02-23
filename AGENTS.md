@@ -40,10 +40,12 @@ When implementation starts, follow `Architecture.md` for Bash script and Bats te
 - Current state: no automated tests in the root repository.
 - If adding implementation code, add tests alongside it using the planned Bats structure in `tests/`.
 - Prefer unit tests for pure functions first, then flow tests with mocks, and keep Azure-dependent checks in the `e2e/` submodule.
+- PR作成前に、変更範囲に応じたテスト/検証コマンドを必ず実行する。
+- PR本文には、実行した検証コマンドだけでなく結果（例: `2件 pass`, `34件 pass`）も記載する。
 
 ## Commit & Pull Request Guidelines
 - Follow the existing Conventional Commit style seen in history: `feat: ...`, `docs: ...`.
 - Japanese commit messages are acceptable and already used; prioritize clarity and scope.
 - 子IssueはPR作成・レビュー中の段階ではCloseしない。原則としてPRマージ後にCloseし、親Issueのチェックリストも同時に更新する。
-- PRs should include: purpose, changed files/areas, validation performed (commands run), and any architecture impact.
+- PR本文には目的、変更ファイル/変更範囲、実施した検証（コマンドと結果）、影響範囲を含める。
 - Link related issues/tasks when applicable, and note submodule updates explicitly if `e2e/` changes.
