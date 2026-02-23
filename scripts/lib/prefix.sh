@@ -1,5 +1,17 @@
 #!/usr/bin/env bash
 
+resolve_target_prefix() {
+  local branch_name="${1-}"
+  local pull_request_number="${2-}"
+
+  if [[ -n "$pull_request_number" ]]; then
+    printf 'pr-%s\n' "$pull_request_number"
+    return 0
+  fi
+
+  printf '%s\n' "$branch_name"
+}
+
 build_site_url() {
   local storage_account="${1-}"
   local target_prefix="${2-}"

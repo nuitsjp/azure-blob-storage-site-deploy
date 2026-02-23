@@ -14,8 +14,24 @@ setup() {
   mock_azure_reset
 }
 
-@test "deploy_main: delete-batch -> upload-batch の順で実行しURLを出力する" {
-  run deploy_main "examplestorage" "${TEST_SOURCE_DIR}" "pr-42"
+@test "deploy_main: branch_name 指定時は branch_name をプレフィックスとしてデプロイする" {
+  run deploy_main "examplestorage" "${TEST_SOURCE_DIR}" "main" ""
+  [ "$status" -eq 0 ]
+  [ "$output" = "https://examplestorage.z22.web.core.windows.net/main/" ]
+
+  [ "$(mock_azure_call_count)" = "2" ]
+
+  local log
+  log="$(mock_azure_read_log)"
+
+  [[ "$log" == *"arg=--pattern"* ]]
+  [[ "$log" == *"arg=main/\\*"* ]]
+  [[ "$log" == *"arg=--destination-path"* ]]
+  [[ "$log" == *"arg=main"* ]]
+}
+
+@test "deploy_main: pull_request_number 指定時は pr-<number> をプレフィックスとしてデプロイする" {
+  run deploy_main "examplestorage" "${TEST_SOURCE_DIR}" "" "42"
   [ "$status" -eq 0 ]
   [ "$output" = "https://examplestorage.z22.web.core.windows.net/pr-42/" ]
 
@@ -43,16 +59,16 @@ setup() {
 }
 
 @test "deploy_main: バリデーションエラー時は az 呼び出しを行わない" {
-  run deploy_main "examplestorage" "${TEST_SOURCE_DIR}" "feature/add-docs"
+  run deploy_main "examplestorage" "${TEST_SOURCE_DIR}" "" ""
   [ "$status" -eq 1 ]
-  [[ "$output" == *"ハイフン"* ]]
+  [[ "$output" == *"branch_name または pull_request_number"* ]]
 
   [ "$(mock_azure_call_count)" = "0" ]
 }
 
 @test "deploy_main: static_website_endpoint 指定時はそのURLを出力する" {
   INPUT_STATIC_WEBSITE_ENDPOINT="https://examplestorage.z11.web.core.windows.net/" \
-    run deploy_main "examplestorage" "${TEST_SOURCE_DIR}" "pr-42"
+    run deploy_main "examplestorage" "${TEST_SOURCE_DIR}" "" "42"
   [ "$status" -eq 0 ]
   [ "$output" = "https://examplestorage.z11.web.core.windows.net/pr-42/" ]
 

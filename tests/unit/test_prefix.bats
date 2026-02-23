@@ -75,3 +75,23 @@ setup() {
   [ "$status" -eq 0 ]
   [ "$output" = "preview/*" ]
 }
+
+# --- resolve_target_prefix ---
+
+@test "resolve_target_prefix: branch_name のみ指定時はそのまま返す" {
+  run resolve_target_prefix "main" ""
+  [ "$status" -eq 0 ]
+  [ "$output" = "main" ]
+}
+
+@test "resolve_target_prefix: pull_request_number 指定時は pr-<number> を返す" {
+  run resolve_target_prefix "feature/foo" "42"
+  [ "$status" -eq 0 ]
+  [ "$output" = "pr-42" ]
+}
+
+@test "resolve_target_prefix: branch_name 空でも pull_request_number があれば pr-<number> を返す" {
+  run resolve_target_prefix "" "42"
+  [ "$status" -eq 0 ]
+  [ "$output" = "pr-42" ]
+}
