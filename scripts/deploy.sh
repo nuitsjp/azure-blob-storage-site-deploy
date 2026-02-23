@@ -18,16 +18,20 @@ deploy_load_libs() {
 deploy_main() {
   local storage_account="${1-${INPUT_STORAGE_ACCOUNT-}}"
   local source_dir="${2-${INPUT_SOURCE_DIR-}}"
-  local target_prefix="${3-${INPUT_TARGET_PREFIX-}}"
-  local action="${4-${INPUT_ACTION-deploy}}"
-  local static_website_endpoint="${5-${INPUT_STATIC_WEBSITE_ENDPOINT-}}"
+  local branch_name="${3-${INPUT_BRANCH_NAME-}}"
+  local pull_request_number="${4-${INPUT_PULL_REQUEST_NUMBER-}}"
+  local action="${5-${INPUT_ACTION-deploy}}"
+  local static_website_endpoint="${6-${INPUT_STATIC_WEBSITE_ENDPOINT-}}"
+  local target_prefix
   local blob_pattern
   local site_url
 
   validate_action "$action" || return 1
   validate_storage_account "$storage_account" || return 1
   validate_source_dir "$action" "$source_dir" || return 1
-  validate_target_prefix "$target_prefix" || return 1
+  validate_prefix_inputs "$branch_name" "$pull_request_number" || return 1
+
+  target_prefix="$(resolve_target_prefix "$branch_name" "$pull_request_number")" || return 1
 
   blob_pattern="$(build_blob_pattern "$target_prefix")" || return 1
   if [[ -n "$static_website_endpoint" ]]; then

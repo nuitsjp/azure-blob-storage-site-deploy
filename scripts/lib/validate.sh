@@ -57,18 +57,47 @@ validate_source_dir() {
   return 0
 }
 
-validate_target_prefix() {
-  local target_prefix="${1-}"
+validate_branch_name() {
+  local branch_name="${1-}"
 
-  if [[ -z "$target_prefix" ]]; then
-    echo "target_prefix は必須です。" >&2
+  if [[ -z "$branch_name" ]]; then
+    echo "branch_name は必須です。" >&2
     return 1
   fi
 
-  if [[ ! "$target_prefix" =~ ^[a-z0-9][a-z0-9-]*$ ]]; then
-    echo "target_prefix は小文字英数字とハイフンのみ使用できます（先頭は小文字英数字）。" >&2
+  if [[ ! "$branch_name" =~ ^[a-z0-9][a-z0-9-]*$ ]]; then
+    echo "branch_name は小文字英数字とハイフンのみ使用できます（先頭は小文字英数字）。" >&2
     return 1
   fi
 
+  return 0
+}
+
+validate_pull_request_number() {
+  local number="${1-}"
+
+  if [[ ! "$number" =~ ^[1-9][0-9]*$ ]]; then
+    echo "pull_request_number は正の整数で指定してください。" >&2
+    return 1
+  fi
+
+  return 0
+}
+
+validate_prefix_inputs() {
+  local branch_name="${1-}"
+  local pull_request_number="${2-}"
+
+  if [[ -n "$pull_request_number" ]]; then
+    validate_pull_request_number "$pull_request_number" || return 1
+    return 0
+  fi
+
+  if [[ -z "$branch_name" ]]; then
+    echo "branch_name または pull_request_number のいずれかは必須です。" >&2
+    return 1
+  fi
+
+  validate_branch_name "$branch_name" || return 1
   return 0
 }

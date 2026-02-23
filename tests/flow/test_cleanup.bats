@@ -9,8 +9,8 @@ setup() {
   mock_azure_reset
 }
 
-@test "cleanup_main: delete-batch を正しいパターンで1回だけ実行する" {
-  run cleanup_main "examplestorage" "pr-42"
+@test "cleanup_main: pull_request_number 指定時は pr-<number> で delete-batch を実行する" {
+  run cleanup_main "examplestorage" "" "42"
   [ "$status" -eq 0 ]
   [ "$output" = "" ]
 
@@ -27,10 +27,22 @@ setup() {
   [[ "$log" == *"arg=pr-42/\\*"* ]]
 }
 
+@test "cleanup_main: branch_name 指定時は branch_name で delete-batch を実行する" {
+  run cleanup_main "examplestorage" "develop" ""
+  [ "$status" -eq 0 ]
+
+  [ "$(mock_azure_call_count)" = "1" ]
+
+  local log
+  log="$(mock_azure_read_log)"
+
+  [[ "$log" == *"arg=develop/\\*"* ]]
+}
+
 @test "cleanup_main: バリデーションエラー時は az 呼び出しを行わない" {
-  run cleanup_main "examplestorage" "feature/add-docs"
+  run cleanup_main "examplestorage" "" ""
   [ "$status" -eq 1 ]
-  [[ "$output" == *"ハイフン"* ]]
+  [[ "$output" == *"branch_name または pull_request_number"* ]]
 
   [ "$(mock_azure_call_count)" = "0" ]
 }

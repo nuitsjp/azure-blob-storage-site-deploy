@@ -1,167 +1,140 @@
 # azure-blob-storage-site-deploy
 
-Azure Blob Storageの静的Webサイト機能を使い、単一のストレージアカウントに複数ブランチのドキュメントサイトをデプロイする再利用可能なGitHub Actions Composite Actionです。
+Azure Blob Storageの静的Webサイト機能を使い、単一のストレージアカウントに複数環境のサイトをデプロイするGitHub Actions Composite Actionです。
 
-永続ブランチ（main, develop等）の常時公開と、PR単位のステージング環境の自動作成・削除を提供します。
+永続ブランチ（`main`、`develop`等）の常時公開と、PRごとのステージング環境の自動作成・自動削除を提供します。
 
-## 背景
+## 特徴
 
-### なぜSWAではなくBlob Storageか
+- **マルチ環境デプロイ** — 1つのストレージアカウント内に `main/`、`develop/`、`pr-42/` のようにプレフィックスで環境を分離
+- **PRステージング** — PRのオープンでステージング環境を自動作成し、クローズで自動削除
+- **クリーンデプロイ** — 既存ファイルを削除してからアップロードするため、ファイル名変更や削除が確実に反映される
+- **OIDC認証** — Azure Entra IDのフェデレーション資格情報による安全な認証（ストレージキー不要）
 
-Azure Static Web Apps（SWA）を採用しない理由は2つある。
+## 前提条件
 
-1. **複数環境の単一リソースへの配置**: SWAは単一サイトの提供を前提としており、mainとdevelopのようなステージングではない複数の永続環境を、単一のAzureリソース内で同時に公開する用途には適さない。Blob Storageの静的Webサイト機能であれば、サブディレクトリによるマルチサイト配信が可能である
-2. **Private Endpointによるアクセス制御**: SWAの静的Webサイトエンドポイントに対してPrivate Endpointを適用することはできない。Blob StorageであればPrivate Endpointを接続し、社内ネットワークからのみアクセスを許可する構成が取れる
+- Azure Blob Storageの静的Webサイト機能が有効化済みのストレージアカウント
+- GitHub ActionsからAzure OIDC認証で接続できる設定（Azure Entra IDアプリ登録 + フェデレーション資格情報）
+- ストレージアカウントに対する「ストレージ Blob データ共同作成者」ロールの割り当て
 
-### スコープ
+## 使い方
 
-- 対象コンテンツは静的サイトジェネレーターが出力したHTMLファイル群に限定する
-- ReactのようなSPAのルーティング対応は行わない
+### 基本：push + PRを1つのワークフローで扱う
 
----
+`branch_name` と `pull_request_number` を渡すだけで、Action内部でプレフィックスを自動解決します。呼び出し側での分岐ロジックは不要です。
 
-## 設計方針
+```yaml
+name: Deploy
 
-### ディレクトリ構成
+on:
+  push:
+    branches: [main]
+  pull_request:
+    types: [opened, synchronize, reopened, closed]
 
-`$web`コンテナ内にプレフィックス付きサブディレクトリを作成し、マルチサイトを実現する。
+permissions:
+  contents: read
+  id-token: write
+
+jobs:
+  deploy:
+    if: github.event.action != 'closed'
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: azure/login@v2
+        with:
+          client-id: ${{ secrets.AZURE_CLIENT_ID }}
+          tenant-id: ${{ secrets.AZURE_TENANT_ID }}
+          subscription-id: ${{ secrets.AZURE_SUBSCRIPTION_ID }}
+
+      - uses: nuitsjp/azure-blob-storage-site-deploy@v1
+        id: deploy
+        with:
+          action: deploy
+          storage_account: ${{ vars.AZURE_STORAGE_ACCOUNT }}
+          source_dir: ./dist
+          branch_name: ${{ github.head_ref || github.ref_name }}
+          pull_request_number: ${{ github.event.pull_request.number }}
+
+      # デプロイ先URL: ${{ steps.deploy.outputs.site_url }}
+
+  cleanup:
+    if: github.event_name == 'pull_request' && github.event.action == 'closed'
+    runs-on: ubuntu-latest
+    steps:
+      - uses: azure/login@v2
+        with:
+          client-id: ${{ secrets.AZURE_CLIENT_ID }}
+          tenant-id: ${{ secrets.AZURE_TENANT_ID }}
+          subscription-id: ${{ secrets.AZURE_SUBSCRIPTION_ID }}
+
+      - uses: nuitsjp/azure-blob-storage-site-deploy@v1
+        with:
+          action: cleanup
+          storage_account: ${{ vars.AZURE_STORAGE_ACCOUNT }}
+          pull_request_number: ${{ github.event.pull_request.number }}
+```
+
+pushイベント時: `branch_name`="main", `pull_request_number`="" → プレフィックス = `main`
+PRイベント時: `branch_name`="feature/foo", `pull_request_number`="42" → プレフィックス = `pr-42`
+
+### カスタムエンドポイントの指定
+
+`static_website_endpoint` を指定すると、出力される `site_url` のベースURLを制御できます。カスタムドメインやAzure Front Door経由の場合に便利です。
+
+```yaml
+- uses: nuitsjp/azure-blob-storage-site-deploy@v1
+  id: deploy
+  with:
+    action: deploy
+    storage_account: ${{ vars.AZURE_STORAGE_ACCOUNT }}
+    source_dir: ./dist
+    branch_name: main
+    static_website_endpoint: https://docs.example.com
+```
+
+## インプット
+
+| 名前 | 必須 | 説明 |
+|------|------|------|
+| `action` | **yes** | `deploy`（デプロイ）または `cleanup`（削除） |
+| `storage_account` | **yes** | Azure Storageアカウント名 |
+| `source_dir` | deploy時のみ | アップロード対象ディレクトリ |
+| `branch_name` | conditional | ブランチ名。`pull_request_number` 未指定時にプレフィックスとして使用 |
+| `pull_request_number` | conditional | PR番号。指定時は `pr-<番号>` をプレフィックスとして使用 |
+| `static_website_endpoint` | no | 静的WebサイトのベースURL。省略時はデフォルトのエンドポイント `https://<account>.z22.web.core.windows.net` を使用 |
+
+> `branch_name` と `pull_request_number` のいずれかは必須です。`pull_request_number` が指定されている場合はそちらが優先されます。
+
+## アウトプット
+
+| 名前 | 説明 |
+|------|------|
+| `site_url` | deploy成功時の配置先URL（末尾スラッシュ付き）。例: `https://<account>.z22.web.core.windows.net/pr-42/` |
+
+## URL構造
+
+デプロイされたサイトは `<endpoint>/<prefix>/` 配下に配置されます。プレフィックスは `branch_name` または `pr-<pull_request_number>` から自動決定されます。
 
 ```
-$web/
-├── index.html          ← ルート（ブランチ一覧等、任意）
-├── main/               ← リリース済みドキュメント（永続）
-│   ├── index.html
-│   └── ...
-├── develop/            ← 開発中ドキュメント（永続）
-│   ├── index.html
-│   └── ...
-├── pr-42/              ← PR #42 のステージング（一時的）
-│   ├── index.html
-│   └── ...
-└── pr-57/              ← PR #57 のステージング（一時的）
-    ├── index.html
-    └── ...
+https://<account>.z22.web.core.windows.net/
+├── main/          ← branch_name: main
+├── develop/       ← branch_name: develop
+├── pr-42/         ← pull_request_number: 42
+└── pr-57/         ← pull_request_number: 57
 ```
 
-アクセスURL例:
-- `https://<account>.z11.web.core.windows.net/main/`
-- `https://<account>.z11.web.core.windows.net/pr-42/`
+> **注意**: Azure Blob Storageの静的Webサイトは `/<prefix>` から `/<prefix>/` への自動リダイレクトを行いません。リンクには必ず末尾スラッシュを含めてください。`site_url` 出力には末尾スラッシュが自動的に付与されます。
 
-### プレフィックスの命名規則
+## 命名規約
 
-| 種別 | プレフィックス | 例 | ライフサイクル |
-|---|---|---|---|
-| 永続ブランチ | ブランチ名そのまま | `main`, `develop` 等 | pushのたびに上書き更新。対象ブランチは呼び出し側ワークフローで宣言する |
-| PRステージング | `pr-<PR番号>` | `pr-42` | PR open時に作成、close時に削除 |
+| 環境 | 入力例 | プレフィックス | 説明 |
+|------|--------|----------------|------|
+| 永続ブランチ | `branch_name: main` | `main` | ブランチ名をそのまま使用 |
+| PRステージング | `pull_request_number: 42` | `pr-42` | `pr-<PR番号>` 形式に自動変換 |
 
-### なぜPR番号ベースか
+## ライセンス
 
-ブランチ名をそのままディレクトリ名に使う方式には以下の問題がある。
-
-1. **日本語ブランチ名の問題**: ブランチ名が全て日本語の場合、ASCIIへのサニタイズで空文字列になり破綻する。URLエンコーディングの不整合やAzure CLI・シェルでの挙動不安定も懸念される
-2. **スラッシュの問題**: `feature/add-docs`のようなブランチ名は`/`がディレクトリ区切りと解釈され、意図しないネストが生じる
-3. **永続ブランチとの区別**: PRクローズ時の削除対象を明確に区別する必要がある。ブランチ名ベースでは永続ブランチ（main等）のディレクトリを誤削除するリスクがある
-
-PR番号（`github.event.pull_request.number`）は整数値で一意・不変であり、これらの問題をすべて回避できる。永続ブランチは運用上ASCIIに限定されるため、ブランチ名をそのまま使って問題ない。
-
-### ステージング環境のライフサイクル
-
-| GitHubイベント | トリガー条件 | アクション |
-|---|---|---|
-| `push` | 呼び出し側で宣言した永続ブランチ | 該当ブランチ名ディレクトリにデプロイ（上書き） |
-| `pull_request` opened | PR作成時 | `pr-<番号>`ディレクトリにデプロイ |
-| `pull_request` synchronize | PRブランチへのpush時 | `pr-<番号>`ディレクトリを更新（上書き） |
-| `pull_request` closed | PRクローズ時（マージ有無問わず） | `pr-<番号>`ディレクトリを削除 |
-
-### 同時デプロイの制御
-
-複数PRが同時にデプロイされてもプレフィックスが異なるため競合しない。同一PR内の連続pushに対してはGitHub Actionsのconcurrencyグループで制御する。
-
-デプロイ先プレフィックス（PR番号またはブランチ名）をconcurrencyグループのキーとし、`cancel-in-progress: true`で先行ジョブをキャンセルする。
-
----
-
-## Action インターフェース
-
-### 責務の分離
-
-SWAのGitHub Actionsと同様に、本actionは**ビルド済み成果物のアップロード・削除のみ**を担当する。ドキュメントのビルドは呼び出し側ワークフローの責務とする。
-
-**なぜこの分離か**: 静的サイトジェネレーターはSphinx、Hugo等多数あり、ビルド手順はプロジェクトごとに異なる。actionをビルドに依存させないことで再利用性を確保する。
-
-### Inputs
-
-| input | 説明 | 必須 |
-|---|---|---|
-| `storage_account` | Azure Storageアカウント名 | ○ |
-| `source_dir` | アップロード対象のディレクトリパス（`action=deploy`時のみ） | △ |
-| `target_prefix` | デプロイ先プレフィックス（例: `main`, `pr-42`） | ○ |
-| `action` | `deploy`（アップロード）または `cleanup`（削除） | ○ |
-
-### 呼び出し側ワークフローの処理フロー
-
-**デプロイジョブ**（PRクローズ以外のイベントで実行）:
-
-1. リポジトリをチェックアウト
-2. ドキュメントをビルド（プロジェクトごとの手順）
-3. `azure/login`でAzure認証
-4. イベント種別に応じてプレフィックスを決定（`pull_request`なら`pr-<番号>`、`push`なら`github.ref_name`）
-5. 本actionを`action=deploy`で呼び出し
-
-**クリーンアップジョブ**（PRクローズ時のみ実行）:
-
-1. `azure/login`でAzure認証
-2. 本actionを`action=cleanup`、`target_prefix=pr-<番号>`で呼び出し
-
-### Azure認証
-
-GitHub Actionsからの認証はOIDC（Federated Credentials）方式を前提とする。呼び出し側が`azure/login`で認証済みであることをactionの前提条件とする。
-
-**なぜOIDCか**: ストレージアカウントキーやSASトークンと比較して、シークレットの管理・ローテーションが不要で、GitHub Actionsとの統合が最も安全かつ推奨される方式である。
-
----
-
-## 技術的な制約と対応
-
-### Static Websiteのインデックスドキュメント
-
-Azure Blob Storageの静的Webサイト設定で「インデックスドキュメント」を`index.html`に設定すれば、`/main/`へのアクセスで`/main/index.html`が返される。これはサブディレクトリごとに機能するため問題ない。
-
-### trailing slash 問題
-
-Azure Blob Storageの静的Webサイトは、`/pr-42` へのアクセスを `/pr-42/` に自動リダイレクトしない。末尾スラッシュなしでアクセスされた場合、ページ内の相対パス（CSS/JS/画像）がルート基準で解決され、表示が崩れる。
-
-この挙動はAzure側の仕様であり、静的Webサイト機能単体では制御できない（Tech Communityで改善要望が出ている状態）。
-
-**対策**: PRコメント等で配布するURLには必ず末尾 `/` を付ける運用ルールとする。将来的にCDN/Front Doorを前段に置く場合はリダイレクトルールで吸収できる。
-
-### エラードキュメント
-
-404ページはストレージアカウント全体で1つしか設定できない。ブランチごとのカスタム404は不可。ただし静的サイトジェネレーターの出力はすべてのページが個別HTMLファイルとして存在するため、404の発生自体が稀であり実用上問題にならない。
-
-### ストレージ容量と課金
-
-PRごとにサイト全体をコピーするため、同時オープン数に比例してストレージ使用量が増加する。ドキュメントサイトのサイズ（通常数十MB程度）を考慮すると、コスト影響は無視できるレベルである。必要に応じてクリーンアップジョブ（長期間放置されたPRステージングの自動削除）を追加で検討できる。
-
-### デプロイ時のファイル同期
-
-`az storage blob upload-batch`は新規・更新ファイルのアップロードのみを行い、ソース側で削除されたファイルをBlob側から自動削除しない。そのままではドキュメントページの削除やリネーム時に古いファイルがBlob上に残り続ける。
-
-**対策**: `deploy`アクション実行時は、対象プレフィックス配下を`delete-batch`で全削除してから`upload-batch`でアップロードする。これにより常にソースとBlob間の完全同期を保証する。
-
-### 公開範囲
-
-Azure Blob Storageの静的Webサイト機能は匿名GETによる配信が基本であり、Entra IDによるアクセス制御には対応していない。
-
-本設計ではストレージアカウントにPrivate Endpointを接続し、そちらからのみアクセスを許可する構成とする。これにより閲覧者の認証・アカウント管理の問題を回避しつつ、社内限定公開を実現する。
-
----
-
-## Roadmap
-
-1. Composite Action（`action.yml`）の実装
-   - `deploy`: `az storage blob delete-batch`で既存ファイルを削除後、`upload-batch`でアップロード
-   - `cleanup`: `az storage blob delete-batch`による削除
-2. 呼び出し側ワークフローテンプレートの作成
-3. PRコメントへのステージングURL自動投稿（オプション）
-4. ルートページ（ブランチ一覧）の自動生成（オプション）
+[MIT](LICENSE)

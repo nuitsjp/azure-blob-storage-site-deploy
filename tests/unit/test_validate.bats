@@ -68,30 +68,103 @@ setup() {
   [[ "$output" == *"ディレクトリではありません"* ]]
 }
 
-@test "validate_target_prefix: main を許可する" {
-  run validate_target_prefix "main"
+# --- validate_pull_request_number ---
+
+@test "validate_pull_request_number: 正の整数を許可する" {
+  run validate_pull_request_number "42"
   [ "$status" -eq 0 ]
 }
 
-@test "validate_target_prefix: pr-42 を許可する" {
-  run validate_target_prefix "pr-42"
+@test "validate_pull_request_number: 1を許可する" {
+  run validate_pull_request_number "1"
   [ "$status" -eq 0 ]
 }
 
-@test "validate_target_prefix: 空文字を拒否する" {
-  run validate_target_prefix ""
+@test "validate_pull_request_number: 0を拒否する" {
+  run validate_pull_request_number "0"
+  [ "$status" -eq 1 ]
+  [[ "$output" == *"正の整数"* ]]
+}
+
+@test "validate_pull_request_number: 負の数を拒否する" {
+  run validate_pull_request_number "-1"
+  [ "$status" -eq 1 ]
+  [[ "$output" == *"正の整数"* ]]
+}
+
+@test "validate_pull_request_number: 英字を拒否する" {
+  run validate_pull_request_number "abc"
+  [ "$status" -eq 1 ]
+  [[ "$output" == *"正の整数"* ]]
+}
+
+@test "validate_pull_request_number: 空文字を拒否する" {
+  run validate_pull_request_number ""
+  [ "$status" -eq 1 ]
+  [[ "$output" == *"正の整数"* ]]
+}
+
+# --- validate_branch_name ---
+
+@test "validate_branch_name: main を許可する" {
+  run validate_branch_name "main"
+  [ "$status" -eq 0 ]
+}
+
+@test "validate_branch_name: pr-42 を許可する" {
+  run validate_branch_name "pr-42"
+  [ "$status" -eq 0 ]
+}
+
+@test "validate_branch_name: 空文字を拒否する" {
+  run validate_branch_name ""
   [ "$status" -eq 1 ]
   [[ "$output" == *"必須"* ]]
 }
 
-@test "validate_target_prefix: スラッシュを拒否する" {
-  run validate_target_prefix "feature/add-docs"
+@test "validate_branch_name: スラッシュを拒否する" {
+  run validate_branch_name "feature/add-docs"
   [ "$status" -eq 1 ]
   [[ "$output" == *"ハイフン"* ]]
 }
 
-@test "validate_target_prefix: 先頭ハイフンを拒否する" {
-  run validate_target_prefix "-preview"
+@test "validate_branch_name: 先頭ハイフンを拒否する" {
+  run validate_branch_name "-preview"
   [ "$status" -eq 1 ]
   [[ "$output" == *"先頭"* ]]
+}
+
+# --- validate_prefix_inputs ---
+
+@test "validate_prefix_inputs: pull_request_number のみ指定で成功する" {
+  run validate_prefix_inputs "" "42"
+  [ "$status" -eq 0 ]
+}
+
+@test "validate_prefix_inputs: branch_name のみ指定で成功する" {
+  run validate_prefix_inputs "main" ""
+  [ "$status" -eq 0 ]
+}
+
+@test "validate_prefix_inputs: 両方指定時は pull_request_number のバリデーションのみ実行する" {
+  run validate_prefix_inputs "feature/foo" "42"
+  [ "$status" -eq 0 ]
+}
+
+@test "validate_prefix_inputs: 両方空で失敗する" {
+  run validate_prefix_inputs "" ""
+  [ "$status" -eq 1 ]
+  [[ "$output" == *"branch_name または pull_request_number"* ]]
+}
+
+@test "validate_prefix_inputs: 不正な pull_request_number で失敗する" {
+  run validate_prefix_inputs "" "abc"
+  [ "$status" -eq 1 ]
+  [[ "$output" == *"正の整数"* ]]
+}
+
+@test "validate_prefix_inputs: 不正な branch_name で失敗する" {
+  run validate_prefix_inputs "feature/add-docs" ""
+  [ "$status" -eq 1 ]
+  [[ "$output" == *"ハイフン"* ]]
 }

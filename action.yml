@@ -8,9 +8,12 @@ inputs:
   source_dir:
     description: アップロード対象ディレクトリ（action=deploy の場合に使用）
     required: false
-  target_prefix:
-    description: "配置先プレフィックス（例: main, pr-42）"
-    required: true
+  branch_name:
+    description: "ブランチ名。pull_request_number 未指定時にプレフィックスとして使用（例: main, develop）"
+    required: false
+  pull_request_number:
+    description: "PR番号。指定時は pr-<番号> をプレフィックスとして使用"
+    required: false
   static_website_endpoint:
     description: "静的WebサイトのベースURL（例: https://examplestorage.z11.web.core.windows.net）"
     required: false
@@ -33,7 +36,8 @@ runs:
       env:
         INPUT_STORAGE_ACCOUNT: ${{ inputs.storage_account }}
         INPUT_SOURCE_DIR: ${{ inputs.source_dir }}
-        INPUT_TARGET_PREFIX: ${{ inputs.target_prefix }}
+        INPUT_BRANCH_NAME: ${{ inputs.branch_name }}
+        INPUT_PULL_REQUEST_NUMBER: ${{ inputs.pull_request_number }}
         INPUT_STATIC_WEBSITE_ENDPOINT: ${{ inputs.static_website_endpoint }}
         INPUT_ACTION: ${{ inputs.action }}
       run: |
@@ -58,7 +62,8 @@ runs:
       shell: bash
       env:
         INPUT_STORAGE_ACCOUNT: ${{ inputs.storage_account }}
-        INPUT_TARGET_PREFIX: ${{ inputs.target_prefix }}
+        INPUT_BRANCH_NAME: ${{ inputs.branch_name }}
+        INPUT_PULL_REQUEST_NUMBER: ${{ inputs.pull_request_number }}
         INPUT_ACTION: ${{ inputs.action }}
       run: |
         set -euo pipefail
