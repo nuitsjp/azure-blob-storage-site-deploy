@@ -46,7 +46,6 @@ azure-blob-storage-site-deploy/
 │   │   └── test_cleanup.bats       # cleanupフローのテスト（azモック）
 │   └── helpers/
 │       └── mock_azure.sh           # az cliのモック（単体・フローテスト用）
-├── e2e/                            # サブモジュール: azure-blob-storage-site-deploy-e2e
 ├── .github/
 │   └── workflows/
 │       └── test-unit.yml           # 単体テスト・フローテスト（PRごとに実行）
@@ -64,6 +63,10 @@ azure-blob-storage-site-deploy/
 **副作用層（`lib/azure.sh`）**: `az storage blob upload-batch` / `delete-batch` 等のaz cli呼び出しを薄い関数としてラップする。テスト時はモック版（`tests/helpers/mock_azure.sh`）に差し替えることで、Azureへの実接続なしにdeploy.sh / cleanup.shのフロー全体をテストできる。
 
 **エントリーポイント（`deploy.sh`, `cleanup.sh`）**: `action.yml`から呼ばれるスクリプト。ロジック層と副作用層の関数を組み合わせて処理を実行する。
+
+### E2Eリポジトリの配置
+
+E2Eテスト用リポジトリ（`azure-blob-storage-site-deploy-e2e`）は本体リポジトリにサブモジュールとして保持しない。ローカル開発時は、開発用メタリポジトリ `azure-blob-storage-site-deploy-dev` 配下（例: `repos/e2e`）で本体リポジトリと並べて管理する。
 
 ### lib/ の関数一覧
 
@@ -97,7 +100,7 @@ bashスクリプトのテストには**bats-core**（Bash Automated Testing Syst
 |---|---|---|---|---|
 | 単体テスト | 本体リポジトリ | lib/の関数群 | 不要 | PR作成・更新時 |
 | フローテスト | 本体リポジトリ | deploy.sh / cleanup.sh（azモック） | 不要 | PR作成・更新時 |
-| E2Eテスト | テスト用リポジトリ（サブモジュール） | ライフサイクル全体 | 必要 | 手動 / リリース前 / スケジュール |
+| E2Eテスト | テスト用リポジトリ（外部。開発時はメタリポジトリ配下で管理） | ライフサイクル全体 | 必要 | 手動 / リリース前 / スケジュール |
 
 ### 単体テスト
 
@@ -113,7 +116,7 @@ bashスクリプトのテストには**bats-core**（Bash Automated Testing Syst
 
 ### E2Eテスト
 
-テスト用リポジトリ `azure-blob-storage-site-deploy-e2e` をgitサブモジュールとして `e2e/` に登録する。
+テスト用リポジトリ `azure-blob-storage-site-deploy-e2e` は本体リポジトリとは分離して管理する。ローカル開発では `azure-blob-storage-site-deploy-dev`（開発用メタリポジトリ）配下に配置し、本体リポジトリと同一ワークスペースで扱う。
 
 #### テスト用リポジトリを分離する理由
 
