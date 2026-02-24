@@ -186,9 +186,9 @@ setup() {
   [ "$status" -eq 0 ]
 }
 
-@test "validate_site_name: 63文字を許可する" {
+@test "validate_site_name: 100文字を許可する" {
   local name
-  name="$(printf 'a%.0s' {1..63})"
+  name="$(printf 'a%.0s' {1..100})"
   run validate_site_name "$name"
   [ "$status" -eq 0 ]
 }
@@ -199,24 +199,24 @@ setup() {
   [[ "$output" == *"必須"* ]]
 }
 
-@test "validate_site_name: 64文字を拒否する" {
+@test "validate_site_name: 101文字を拒否する" {
   local name
-  name="$(printf 'a%.0s' {1..64})"
+  name="$(printf 'a%.0s' {1..101})"
   run validate_site_name "$name"
   [ "$status" -eq 1 ]
-  [[ "$output" == *"63文字"* ]]
+  [[ "$output" == *"100文字"* ]]
 }
 
 @test "validate_site_name: 先頭ハイフンを拒否する" {
   run validate_site_name "-api-docs"
   [ "$status" -eq 1 ]
-  [[ "$output" == *"先頭・末尾にハイフン"* ]]
+  [[ "$output" == *"先頭・末尾は英数字"* ]]
 }
 
 @test "validate_site_name: 末尾ハイフンを拒否する" {
   run validate_site_name "api-docs-"
   [ "$status" -eq 1 ]
-  [[ "$output" == *"先頭・末尾にハイフン"* ]]
+  [[ "$output" == *"先頭・末尾は英数字"* ]]
 }
 
 @test "validate_site_name: スラッシュを拒否する" {
@@ -229,12 +229,61 @@ setup() {
   [ "$status" -eq 1 ]
 }
 
-@test "validate_site_name: 大文字を拒否する" {
+@test "validate_site_name: 大文字を許可する" {
   run validate_site_name "ApiDocs"
-  [ "$status" -eq 1 ]
+  [ "$status" -eq 0 ]
 }
 
-@test "validate_site_name: アンダースコアを拒否する" {
+@test "validate_site_name: アンダースコアを許可する" {
   run validate_site_name "api_docs"
+  [ "$status" -eq 0 ]
+}
+
+@test "validate_site_name: ピリオドを含む名前を許可する" {
+  run validate_site_name "my.docs"
+  [ "$status" -eq 0 ]
+}
+
+@test "validate_site_name: 大文字・アンダースコア・ピリオド混在を許可する" {
+  run validate_site_name "My_Repo.docs"
+  [ "$status" -eq 0 ]
+}
+
+@test "validate_site_name: 先頭ピリオドを拒否する" {
+  run validate_site_name ".api-docs"
   [ "$status" -eq 1 ]
+  [[ "$output" == *"先頭・末尾は英数字"* ]]
+}
+
+@test "validate_site_name: 末尾アンダースコアを拒否する" {
+  run validate_site_name "api-docs_"
+  [ "$status" -eq 1 ]
+  [[ "$output" == *"先頭・末尾は英数字"* ]]
+}
+
+# --- resolve_site_name ---
+
+@test "resolve_site_name: 明示的な値はそのまま返す" {
+  run resolve_site_name "my-site"
+  [ "$status" -eq 0 ]
+  [ "$output" = "my-site" ]
+}
+
+@test "resolve_site_name: 空文字列 + 第2引数から導出する" {
+  run resolve_site_name "" "owner/repo-name"
+  [ "$status" -eq 0 ]
+  [ "$output" = "repo-name" ]
+}
+
+@test "resolve_site_name: 空文字列 + GITHUB_REPOSITORY 環境変数から導出する" {
+  GITHUB_REPOSITORY="owner/env-repo" run resolve_site_name ""
+  [ "$status" -eq 0 ]
+  [ "$output" = "env-repo" ]
+}
+
+@test "resolve_site_name: 空文字列 + 両方未設定でエラーになる" {
+  unset GITHUB_REPOSITORY
+  run resolve_site_name ""
+  [ "$status" -eq 1 ]
+  [[ "$output" == *"GITHUB_REPOSITORY"* ]]
 }

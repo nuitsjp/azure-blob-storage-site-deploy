@@ -27,6 +27,7 @@ cleanup_main() {
 
   validate_action "$action" || return 1
   validate_storage_account "$storage_account" || return 1
+  site_name="$(resolve_site_name "$site_name")" || return 1
   validate_site_name "$site_name" || return 1
   validate_prefix_inputs "$branch_name" "$pull_request_number" || return 1
 

@@ -102,6 +102,23 @@ validate_prefix_inputs() {
   return 0
 }
 
+resolve_site_name() {
+  local name="${1-}"
+  local github_repository="${2-${GITHUB_REPOSITORY-}}"
+
+  if [[ -n "$name" ]]; then
+    printf '%s\n' "$name"
+    return 0
+  fi
+
+  if [[ -z "$github_repository" ]]; then
+    echo "site_name が未指定で、GITHUB_REPOSITORY 環境変数も設定されていません。" >&2
+    return 1
+  fi
+
+  printf '%s\n' "${github_repository#*/}"
+}
+
 validate_site_name() {
   local name="${1-}"
 
@@ -110,13 +127,13 @@ validate_site_name() {
     return 1
   fi
 
-  if [[ ${#name} -gt 63 ]]; then
-    echo "site_name は63文字以内で指定してください。" >&2
+  if [[ ${#name} -gt 100 ]]; then
+    echo "site_name は100文字以内で指定してください。" >&2
     return 1
   fi
 
-  if [[ ! "$name" =~ ^[a-z0-9]([a-z0-9-]*[a-z0-9])?$ ]]; then
-    echo "site_name は小文字英数字とハイフンのみ使用でき、先頭・末尾にハイフンは使用できません。" >&2
+  if [[ ! "$name" =~ ^[a-zA-Z0-9]([a-zA-Z0-9._-]*[a-zA-Z0-9])?$ ]]; then
+    echo "site_name は英数字・ハイフン・アンダースコア・ピリオドのみ使用でき、先頭・末尾は英数字にしてください。" >&2
     return 1
   fi
 
