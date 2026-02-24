@@ -48,9 +48,22 @@ setup() {
 }
 
 @test "cleanup_main: バリデーションエラー時は az 呼び出しを行わない（site_name未指定）" {
+  unset GITHUB_REPOSITORY
   run cleanup_main "examplestorage" "" "42" "cleanup" ""
   [ "$status" -eq 1 ]
-  [[ "$output" == *"site_name"* ]]
+  [[ "$output" == *"GITHUB_REPOSITORY"* ]]
 
   [ "$(mock_azure_call_count)" = "0" ]
+}
+
+@test "cleanup_main: site_name 未指定時は GITHUB_REPOSITORY から自動導出する" {
+  export GITHUB_REPOSITORY="owner/auto-repo"
+  run cleanup_main "examplestorage" "" "42" "cleanup" ""
+  [ "$status" -eq 0 ]
+
+  [ "$(mock_azure_call_count)" = "1" ]
+
+  local log
+  log="$(mock_azure_read_log)"
+  [[ "$log" == *"arg=auto-repo/pr-42/\\*"* ]]
 }

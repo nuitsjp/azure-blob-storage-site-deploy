@@ -2,7 +2,7 @@
 
 Azure Blob Storageの静的Webサイト機能を使い、単一のストレージアカウントに複数リポジトリの複数環境のサイトをデプロイするGitHub Actions Composite Actionです。
 
-`site_name`による名前空間分離により、複数リポジトリが同一ストレージアカウントに安全にデプロイできます。永続ブランチ（`main`、`develop`等）の常時公開と、PRごとのステージング環境の自動作成・自動削除を提供します。
+`site_name`による名前空間分離により、複数リポジトリが同一ストレージアカウントに安全にデプロイできます。`site_name`を省略すると、`GITHUB_REPOSITORY`環境変数からリポジトリ名を自動導出します。永続ブランチ（`main`、`develop`等）の常時公開と、PRごとのステージング環境の自動作成・自動削除を提供します。
 
 ## 特徴
 
@@ -84,6 +84,21 @@ jobs:
 pushイベント時: `branch_name`="main", `pull_request_number`="" → プレフィックス = `my-docs/main`
 PRイベント時: `branch_name`="feature/foo", `pull_request_number`="42" → プレフィックス = `my-docs/pr-42`
 
+### site_name の省略（自動導出）
+
+`site_name`を省略すると、GitHub Actionsの`GITHUB_REPOSITORY`環境変数（例: `owner/my-app`）からリポジトリ名（`my-app`）を自動導出します。多くの場合、リポジトリ名をそのまま`site_name`として使用するため、明示的な指定は不要です。
+
+```yaml
+- uses: nuitsjp/azure-blob-storage-site-deploy@v1
+  with:
+    action: deploy
+    storage_account: ${{ vars.AZURE_STORAGE_ACCOUNT }}
+    source_dir: ./dist
+    # site_name 省略 → GITHUB_REPOSITORY からリポジトリ名を自動導出
+    branch_name: ${{ github.head_ref || github.ref_name }}
+    pull_request_number: ${{ github.event.pull_request.number }}
+```
+
 ### カスタムエンドポイントの指定
 
 `static_website_endpoint` を指定すると、出力される `site_url` のベースURLを制御できます。カスタムドメインやAzure Front Door経由の場合に便利です。
@@ -118,7 +133,7 @@ Private Endpointでアクセスを制限している場合、1つのストレー
 | `action` | **yes** | `deploy`（デプロイ）または `cleanup`（削除） |
 | `storage_account` | **yes** | Azure Storageアカウント名 |
 | `source_dir` | deploy時のみ | アップロード対象ディレクトリ |
-| `site_name` | **yes** | サイト識別名。同一ストレージアカウント内でリポジトリごとの名前空間を分離する |
+| `site_name` | no | サイト識別名。省略時は`GITHUB_REPOSITORY`からリポジトリ名を自動導出 |
 | `branch_name` | conditional | ブランチ名。`pull_request_number` 未指定時にプレフィックスとして使用 |
 | `pull_request_number` | conditional | PR番号。指定時は `pr-<番号>` をプレフィックスとして使用 |
 | `static_website_endpoint` | no | 静的WebサイトのベースURL。省略時はデフォルトのエンドポイント `https://<account>.z22.web.core.windows.net` を使用 |
@@ -150,9 +165,10 @@ https://<account>.z22.web.core.windows.net/
 
 ## `site_name` の命名規則
 
-- 小文字英数字とハイフンのみ使用可能（`^[a-z0-9]([a-z0-9-]*[a-z0-9])?$`）
-- 先頭・末尾のハイフンは不可
-- 最大63文字
+- 英数字・ハイフン・アンダースコア・ピリオドが使用可能（`^[a-zA-Z0-9]([a-zA-Z0-9._-]*[a-zA-Z0-9])?$`）
+- 先頭・末尾は英数字のみ
+- 最大100文字
+- 省略時は`GITHUB_REPOSITORY`環境変数（`owner/repo-name`形式）からリポジトリ名部分を自動導出
 
 ## 命名規約
 

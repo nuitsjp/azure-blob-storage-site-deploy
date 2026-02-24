@@ -9,8 +9,9 @@ inputs:
     description: アップロード対象ディレクトリ（action=deploy の場合に使用）
     required: false
   site_name:
-    description: サイト識別名。同一ストレージアカウント内でリポジトリごとの名前空間を分離する
-    required: true
+    description: サイト識別名。省略時はリポジトリ名から自動導出
+    required: false
+    default: ''
   branch_name:
     description: "ブランチ名。pull_request_number 未指定時にプレフィックスとして使用（例: main, develop）"
     required: false
