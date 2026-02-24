@@ -77,14 +77,18 @@ validate.sh
 ├── validate_source_dir()           # ディレクトリ存在チェック（deploy時）
 ├── validate_branch_name()          # ブランチ名の形式チェック
 ├── validate_pull_request_number()  # PR番号の正の整数チェック
-└── validate_prefix_inputs()        # branch_name / pull_request_number の入力検証
+├── validate_prefix_inputs()        # branch_name / pull_request_number の入力検証
+└── validate_site_name()            # サイト識別名の形式チェック（小文字英数字+ハイフン、63文字以内）
 
 prefix.sh
+├── build_blob_prefix()             # site_name + target_prefix からBlobプレフィックスを生成（<site_name>/<target_prefix>）
 ├── resolve_target_prefix()         # branch_name + pull_request_number からプレフィックスを解決
 ├── build_site_url()                # アカウント名+プレフィックスからURL生成（末尾/保証）
 ├── build_site_url_from_endpoint()  # エンドポイント+プレフィックスからURL生成（末尾/保証）
 └── build_blob_pattern()            # delete-batch用のパターン文字列生成
 ```
+
+**deploy.sh / cleanup.sh**: `INPUT_SITE_NAME`の環境変数を読み取り、`build_blob_prefix()`でsite_nameとtarget_prefixを結合してから既存関数に渡す。azure.shは結合済みのパスを不透明な文字列として扱う。
 
 ---
 
@@ -146,10 +150,10 @@ azure-blob-storage-site-deploy-e2e/
 
 | ステップ | 操作 | 検証内容 |
 |---|---|---|
-| 1 | `main`ブランチにpush | `main/index.html`がHTTPアクセスで取得できる |
-| 2 | テストブランチを作成しPRをopen | `pr-<番号>/index.html`がHTTPアクセスで取得できる |
-| 3 | テストブランチにファイル変更をpush | `pr-<番号>/`の内容が更新されている。古いファイルが残っていない |
-| 4 | PRをclose | `pr-<番号>/`配下が存在しない（404が返る） |
+| 1 | `main`ブランチにpush | `<site_name>/main/index.html`がHTTPアクセスで取得できる |
+| 2 | テストブランチを作成しPRをopen | `<site_name>/pr-<番号>/index.html`がHTTPアクセスで取得できる |
+| 3 | テストブランチにファイル変更をpush | `<site_name>/pr-<番号>/`の内容が更新されている。古いファイルが残っていない |
+| 4 | PRをclose | `<site_name>/pr-<番号>/`配下が存在しない（404が返る） |
 | 5 | 後片付け | テストブランチを削除 |
 
 各ステップの間には、GitHub APIの`GET /repos/{owner}/{repo}/actions/runs`でワークフローの完了をポーリングし、完了を確認してから検証に進む。

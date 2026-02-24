@@ -95,3 +95,33 @@ setup() {
   [ "$status" -eq 0 ]
   [ "$output" = "pr-42" ]
 }
+
+# --- build_blob_prefix ---
+
+@test "build_blob_prefix: site_name と target_prefix を結合する" {
+  run build_blob_prefix "api-docs" "main"
+  [ "$status" -eq 0 ]
+  [ "$output" = "api-docs/main" ]
+}
+
+@test "build_blob_prefix: PR番号プレフィックスを正しく結合する" {
+  run build_blob_prefix "user-guide" "pr-42"
+  [ "$status" -eq 0 ]
+  [ "$output" = "user-guide/pr-42" ]
+}
+
+@test "build_blob_prefix: build_blob_pattern と組み合わせて正しいパターンを生成する" {
+  local prefix
+  prefix="$(build_blob_prefix "api-docs" "pr-42")"
+  run build_blob_pattern "$prefix"
+  [ "$status" -eq 0 ]
+  [ "$output" = "api-docs/pr-42/*" ]
+}
+
+@test "build_blob_prefix: build_site_url_from_endpoint と組み合わせて正しいURLを生成する" {
+  local prefix
+  prefix="$(build_blob_prefix "api-docs" "main")"
+  run build_site_url_from_endpoint "https://myaccount.z11.web.core.windows.net" "$prefix"
+  [ "$status" -eq 0 ]
+  [ "$output" = "https://myaccount.z11.web.core.windows.net/api-docs/main/" ]
+}

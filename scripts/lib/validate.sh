@@ -101,3 +101,24 @@ validate_prefix_inputs() {
   validate_branch_name "$branch_name" || return 1
   return 0
 }
+
+validate_site_name() {
+  local name="${1-}"
+
+  if [[ -z "$name" ]]; then
+    echo "site_name は必須です。" >&2
+    return 1
+  fi
+
+  if [[ ${#name} -gt 63 ]]; then
+    echo "site_name は63文字以内で指定してください。" >&2
+    return 1
+  fi
+
+  if [[ ! "$name" =~ ^[a-z0-9]([a-z0-9-]*[a-z0-9])?$ ]]; then
+    echo "site_name は小文字英数字とハイフンのみ使用でき、先頭・末尾にハイフンは使用できません。" >&2
+    return 1
+  fi
+
+  return 0
+}

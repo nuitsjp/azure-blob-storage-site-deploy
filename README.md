@@ -1,12 +1,13 @@
 # azure-blob-storage-site-deploy
 
-Azure Blob Storageの静的Webサイト機能を使い、単一のストレージアカウントに複数環境のサイトをデプロイするGitHub Actions Composite Actionです。
+Azure Blob Storageの静的Webサイト機能を使い、単一のストレージアカウントに複数リポジトリの複数環境のサイトをデプロイするGitHub Actions Composite Actionです。
 
-永続ブランチ（`main`、`develop`等）の常時公開と、PRごとのステージング環境の自動作成・自動削除を提供します。
+`site_name`による名前空間分離により、複数リポジトリが同一ストレージアカウントに安全にデプロイできます。永続ブランチ（`main`、`develop`等）の常時公開と、PRごとのステージング環境の自動作成・自動削除を提供します。
 
 ## 特徴
 
-- **マルチ環境デプロイ** — 1つのストレージアカウント内に `main/`、`develop/`、`pr-42/` のようにプレフィックスで環境を分離
+- **マルチリポジトリ対応** — `site_name`による名前空間分離で、複数リポジトリが同一ストレージアカウントに安全にデプロイ。1つのPrivate Endpointで複数サイトをホスト可能
+- **マルチ環境デプロイ** — 各サイト内で `main/`、`develop/`、`pr-42/` のようにプレフィックスで環境を分離
 - **PRステージング** — PRのオープンでステージング環境を自動作成し、クローズで自動削除
 - **クリーンデプロイ** — 既存ファイルを削除してからアップロードするため、ファイル名変更や削除が確実に反映される
 - **OIDC認証** — Azure Entra IDのフェデレーション資格情報による安全な認証（ストレージキー不要）
@@ -55,8 +56,10 @@ jobs:
           action: deploy
           storage_account: ${{ vars.AZURE_STORAGE_ACCOUNT }}
           source_dir: ./dist
+          site_name: my-docs
           branch_name: ${{ github.head_ref || github.ref_name }}
           pull_request_number: ${{ github.event.pull_request.number }}
+          static_website_endpoint: ${{ steps.website.outputs.endpoint }}
 
       # デプロイ先URL: ${{ steps.deploy.outputs.site_url }}
 
@@ -74,11 +77,12 @@ jobs:
         with:
           action: cleanup
           storage_account: ${{ vars.AZURE_STORAGE_ACCOUNT }}
+          site_name: my-docs
           pull_request_number: ${{ github.event.pull_request.number }}
 ```
 
-pushイベント時: `branch_name`="main", `pull_request_number`="" → プレフィックス = `main`
-PRイベント時: `branch_name`="feature/foo", `pull_request_number`="42" → プレフィックス = `pr-42`
+pushイベント時: `branch_name`="main", `pull_request_number`="" → プレフィックス = `my-docs/main`
+PRイベント時: `branch_name`="feature/foo", `pull_request_number`="42" → プレフィックス = `my-docs/pr-42`
 
 ### カスタムエンドポイントの指定
 
@@ -91,9 +95,21 @@ PRイベント時: `branch_name`="feature/foo", `pull_request_number`="42" → �
     action: deploy
     storage_account: ${{ vars.AZURE_STORAGE_ACCOUNT }}
     source_dir: ./dist
+    site_name: api-docs
     branch_name: main
     static_website_endpoint: https://docs.example.com
 ```
+
+### マルチリポジトリデプロイ
+
+`site_name`により、複数のリポジトリが同一ストレージアカウントに安全にデプロイできます。各リポジトリで固有の`site_name`を指定することで名前空間が分離されます。
+
+```yaml
+# リポジトリA: site_name: api-docs → $web/api-docs/main/
+# リポジトリB: site_name: user-guide → $web/user-guide/main/
+```
+
+Private Endpointでアクセスを制限している場合、1つのストレージアカウント（＝1つのPrivate Endpoint）で複数サイトをホストできます。
 
 ## インプット
 
@@ -102,6 +118,7 @@ PRイベント時: `branch_name`="feature/foo", `pull_request_number`="42" → �
 | `action` | **yes** | `deploy`（デプロイ）または `cleanup`（削除） |
 | `storage_account` | **yes** | Azure Storageアカウント名 |
 | `source_dir` | deploy時のみ | アップロード対象ディレクトリ |
+| `site_name` | **yes** | サイト識別名。同一ストレージアカウント内でリポジトリごとの名前空間を分離する |
 | `branch_name` | conditional | ブランチ名。`pull_request_number` 未指定時にプレフィックスとして使用 |
 | `pull_request_number` | conditional | PR番号。指定時は `pr-<番号>` をプレフィックスとして使用 |
 | `static_website_endpoint` | no | 静的WebサイトのベースURL。省略時はデフォルトのエンドポイント `https://<account>.z22.web.core.windows.net` を使用 |
@@ -112,28 +129,37 @@ PRイベント時: `branch_name`="feature/foo", `pull_request_number`="42" → �
 
 | 名前 | 説明 |
 |------|------|
-| `site_url` | deploy成功時の配置先URL（末尾スラッシュ付き）。例: `https://<account>.z22.web.core.windows.net/pr-42/` |
+| `site_url` | deploy成功時の配置先URL（末尾スラッシュ付き）。例: `https://<account>.z22.web.core.windows.net/api-docs/pr-42/` |
 
 ## URL構造
 
-デプロイされたサイトは `<endpoint>/<prefix>/` 配下に配置されます。プレフィックスは `branch_name` または `pr-<pull_request_number>` から自動決定されます。
+デプロイされたサイトは `<endpoint>/<site_name>/<prefix>/` 配下に配置されます。プレフィックスは `branch_name` または `pr-<pull_request_number>` から自動決定されます。
 
 ```
 https://<account>.z22.web.core.windows.net/
-├── main/          ← branch_name: main
-├── develop/       ← branch_name: develop
-├── pr-42/         ← pull_request_number: 42
-└── pr-57/         ← pull_request_number: 57
+├── api-docs/              ← site_name: api-docs（リポジトリA）
+│   ├── main/              ← branch_name: main
+│   ├── develop/           ← branch_name: develop
+│   └── pr-42/             ← pull_request_number: 42
+└── user-guide/            ← site_name: user-guide（リポジトリB）
+    ├── main/
+    └── pr-10/
 ```
 
-> **注意**: Azure Blob Storageの静的Webサイトは `/<prefix>` から `/<prefix>/` への自動リダイレクトを行いません。リンクには必ず末尾スラッシュを含めてください。`site_url` 出力には末尾スラッシュが自動的に付与されます。
+> **注意**: Azure Blob Storageの静的Webサイトは `/<site_name>/<prefix>` から `/<site_name>/<prefix>/` への自動リダイレクトを行いません。リンクには必ず末尾スラッシュを含めてください。`site_url` 出力には末尾スラッシュが自動的に付与されます。
+
+## `site_name` の命名規則
+
+- 小文字英数字とハイフンのみ使用可能（`^[a-z0-9]([a-z0-9-]*[a-z0-9])?$`）
+- 先頭・末尾のハイフンは不可
+- 最大63文字
 
 ## 命名規約
 
-| 環境 | 入力例 | プレフィックス | 説明 |
+| 環境 | 入力例 | Blobプレフィックス | 説明 |
 |------|--------|----------------|------|
-| 永続ブランチ | `branch_name: main` | `main` | ブランチ名をそのまま使用 |
-| PRステージング | `pull_request_number: 42` | `pr-42` | `pr-<PR番号>` 形式に自動変換 |
+| 永続ブランチ | `site_name: api-docs`, `branch_name: main` | `api-docs/main` | site_name + ブランチ名 |
+| PRステージング | `site_name: api-docs`, `pull_request_number: 42` | `api-docs/pr-42` | site_name + `pr-<PR番号>` |
 
 ## ライセンス
 
