@@ -1,5 +1,12 @@
 #!/usr/bin/env bash
 
+build_blob_prefix() {
+  local site_name="${1-}"
+  local target_prefix="${2-}"
+
+  printf '%s/%s\n' "$site_name" "$target_prefix"
+}
+
 resolve_target_prefix() {
   local branch_name="${1-}"
   local pull_request_number="${2-}"

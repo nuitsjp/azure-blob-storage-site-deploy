@@ -168,3 +168,73 @@ setup() {
   [ "$status" -eq 1 ]
   [[ "$output" == *"ハイフン"* ]]
 }
+
+# --- validate_site_name ---
+
+@test "validate_site_name: 正常なサイト名を許可する" {
+  run validate_site_name "api-docs"
+  [ "$status" -eq 0 ]
+}
+
+@test "validate_site_name: 数字のみを許可する" {
+  run validate_site_name "123"
+  [ "$status" -eq 0 ]
+}
+
+@test "validate_site_name: 1文字を許可する" {
+  run validate_site_name "a"
+  [ "$status" -eq 0 ]
+}
+
+@test "validate_site_name: 63文字を許可する" {
+  local name
+  name="$(printf 'a%.0s' {1..63})"
+  run validate_site_name "$name"
+  [ "$status" -eq 0 ]
+}
+
+@test "validate_site_name: 空文字列を拒否する" {
+  run validate_site_name ""
+  [ "$status" -eq 1 ]
+  [[ "$output" == *"必須"* ]]
+}
+
+@test "validate_site_name: 64文字を拒否する" {
+  local name
+  name="$(printf 'a%.0s' {1..64})"
+  run validate_site_name "$name"
+  [ "$status" -eq 1 ]
+  [[ "$output" == *"63文字"* ]]
+}
+
+@test "validate_site_name: 先頭ハイフンを拒否する" {
+  run validate_site_name "-api-docs"
+  [ "$status" -eq 1 ]
+  [[ "$output" == *"先頭・末尾にハイフン"* ]]
+}
+
+@test "validate_site_name: 末尾ハイフンを拒否する" {
+  run validate_site_name "api-docs-"
+  [ "$status" -eq 1 ]
+  [[ "$output" == *"先頭・末尾にハイフン"* ]]
+}
+
+@test "validate_site_name: スラッシュを拒否する" {
+  run validate_site_name "api/docs"
+  [ "$status" -eq 1 ]
+}
+
+@test "validate_site_name: アスタリスクを拒否する" {
+  run validate_site_name "api*docs"
+  [ "$status" -eq 1 ]
+}
+
+@test "validate_site_name: 大文字を拒否する" {
+  run validate_site_name "ApiDocs"
+  [ "$status" -eq 1 ]
+}
+
+@test "validate_site_name: アンダースコアを拒否する" {
+  run validate_site_name "api_docs"
+  [ "$status" -eq 1 ]
+}

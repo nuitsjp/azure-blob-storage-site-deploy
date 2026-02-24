@@ -20,16 +20,20 @@ cleanup_main() {
   local branch_name="${2-${INPUT_BRANCH_NAME-}}"
   local pull_request_number="${3-${INPUT_PULL_REQUEST_NUMBER-}}"
   local action="${4-${INPUT_ACTION-cleanup}}"
+  local site_name="${5-${INPUT_SITE_NAME-}}"
   local target_prefix
+  local blob_prefix
   local blob_pattern
 
   validate_action "$action" || return 1
   validate_storage_account "$storage_account" || return 1
+  validate_site_name "$site_name" || return 1
   validate_prefix_inputs "$branch_name" "$pull_request_number" || return 1
 
   target_prefix="$(resolve_target_prefix "$branch_name" "$pull_request_number")" || return 1
+  blob_prefix="$(build_blob_prefix "$site_name" "$target_prefix")" || return 1
 
-  blob_pattern="$(build_blob_pattern "$target_prefix")" || return 1
+  blob_pattern="$(build_blob_pattern "$blob_prefix")" || return 1
 
   azure_delete_prefix "$storage_account" "$blob_pattern" || return 1
 }

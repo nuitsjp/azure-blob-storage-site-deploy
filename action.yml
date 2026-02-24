@@ -8,6 +8,9 @@ inputs:
   source_dir:
     description: アップロード対象ディレクトリ（action=deploy の場合に使用）
     required: false
+  site_name:
+    description: サイト識別名。同一ストレージアカウント内でリポジトリごとの名前空間を分離する
+    required: true
   branch_name:
     description: "ブランチ名。pull_request_number 未指定時にプレフィックスとして使用（例: main, develop）"
     required: false
@@ -36,6 +39,7 @@ runs:
       env:
         INPUT_STORAGE_ACCOUNT: ${{ inputs.storage_account }}
         INPUT_SOURCE_DIR: ${{ inputs.source_dir }}
+        INPUT_SITE_NAME: ${{ inputs.site_name }}
         INPUT_BRANCH_NAME: ${{ inputs.branch_name }}
         INPUT_PULL_REQUEST_NUMBER: ${{ inputs.pull_request_number }}
         INPUT_STATIC_WEBSITE_ENDPOINT: ${{ inputs.static_website_endpoint }}
@@ -62,6 +66,7 @@ runs:
       shell: bash
       env:
         INPUT_STORAGE_ACCOUNT: ${{ inputs.storage_account }}
+        INPUT_SITE_NAME: ${{ inputs.site_name }}
         INPUT_BRANCH_NAME: ${{ inputs.branch_name }}
         INPUT_PULL_REQUEST_NUMBER: ${{ inputs.pull_request_number }}
         INPUT_ACTION: ${{ inputs.action }}
