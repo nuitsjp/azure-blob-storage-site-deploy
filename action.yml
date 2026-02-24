@@ -1,0 +1,70 @@
+name: Azure Blob Storage Site Deploy
+description: Azure Blob Storage 静的Webサイト配下へ成果物をデプロイまたはクリーンアップする Composite Action
+
+inputs:
+  storage_account:
+    description: Azure Storageアカウント名
+    required: true
+  source_dir:
+    description: アップロード対象ディレクトリ（action=deploy の場合に使用）
+    required: false
+  branch_name:
+    description: "ブランチ名。pull_request_number 未指定時にプレフィックスとして使用（例: main, develop）"
+    required: false
+  pull_request_number:
+    description: "PR番号。指定時は pr-<番号> をプレフィックスとして使用"
+    required: false
+  static_website_endpoint:
+    description: "静的WebサイトのベースURL（例: https://examplestorage.z11.web.core.windows.net）"
+    required: false
+  action:
+    description: 実行種別（deploy または cleanup）
+    required: true
+
+outputs:
+  site_url:
+    description: deploy 成功時の配置先URL（末尾スラッシュ付き）
+    value: ${{ steps.deploy.outputs.site_url }}
+
+runs:
+  using: composite
+  steps:
+    - name: deploy を実行
+      id: deploy
+      if: ${{ inputs.action == 'deploy' }}
+      shell: bash
+      env:
+        INPUT_STORAGE_ACCOUNT: ${{ inputs.storage_account }}
+        INPUT_SOURCE_DIR: ${{ inputs.source_dir }}
+        INPUT_BRANCH_NAME: ${{ inputs.branch_name }}
+        INPUT_PULL_REQUEST_NUMBER: ${{ inputs.pull_request_number }}
+        INPUT_STATIC_WEBSITE_ENDPOINT: ${{ inputs.static_website_endpoint }}
+        INPUT_ACTION: ${{ inputs.action }}
+      run: |
+        set -euo pipefail
+        deploy_output="$("${{ github.action_path }}/scripts/deploy.sh")"
+        printf '%s\n' "$deploy_output"
+
+        site_url="$(printf '%s\n' "$deploy_output" | tail -n 1)"
+        if [[ -z "$site_url" ]]; then
+          echo "配置先URLの取得に失敗しました" >&2
+          exit 1
+        fi
+
+        {
+          echo "site_url<<EOF"
+          printf '%s\n' "$site_url"
+          echo "EOF"
+        } >> "$GITHUB_OUTPUT"
+
+    - name: cleanup を実行
+      if: ${{ inputs.action == 'cleanup' }}
+      shell: bash
+      env:
+        INPUT_STORAGE_ACCOUNT: ${{ inputs.storage_account }}
+        INPUT_BRANCH_NAME: ${{ inputs.branch_name }}
+        INPUT_PULL_REQUEST_NUMBER: ${{ inputs.pull_request_number }}
+        INPUT_ACTION: ${{ inputs.action }}
+      run: |
+        set -euo pipefail
+        "${{ github.action_path }}/scripts/cleanup.sh"

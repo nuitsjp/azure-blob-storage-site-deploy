@@ -1,5 +1,11 @@
 # Architecture
 
+## 本書の位置づけ
+
+- `README.md`: オンボーディングと全体像
+- `Design.md`: プロダクト/運用設計（要件・制約・インターフェース）
+- `Architecture.md`（本書）: 実装構成、スクリプト分割、テスト戦略
+
 ## 実装技術
 
 ### Composite Action
@@ -43,8 +49,9 @@ azure-blob-storage-site-deploy/
 ├── .github/
 │   └── workflows/
 │       └── test-unit.yml           # 単体テスト・フローテスト（PRごとに実行）
-├── README.md
-└── Architecture.md                 # 本ドキュメント
+├── README.md                       # オンボーディング
+├── Design.md                       # 設計判断・制約・運用設計
+└── Architecture.md                 # 本ドキュメント（実装設計）
 ```
 
 ### scripts/ の設計原則：ロジックと副作用の分離
@@ -68,10 +75,14 @@ validate.sh
 ├── validate_storage_account()      # アカウント名の形式チェック
 ├── validate_action()               # "deploy" or "cleanup" の検証
 ├── validate_source_dir()           # ディレクトリ存在チェック（deploy時）
-└── validate_target_prefix()        # プレフィックスの形式チェック
+├── validate_branch_name()          # ブランチ名の形式チェック
+├── validate_pull_request_number()  # PR番号の正の整数チェック
+└── validate_prefix_inputs()        # branch_name / pull_request_number の入力検証
 
 prefix.sh
+├── resolve_target_prefix()         # branch_name + pull_request_number からプレフィックスを解決
 ├── build_site_url()                # アカウント名+プレフィックスからURL生成（末尾/保証）
+├── build_site_url_from_endpoint()  # エンドポイント+プレフィックスからURL生成（末尾/保証）
 └── build_blob_pattern()            # delete-batch用のパターン文字列生成
 ```
 

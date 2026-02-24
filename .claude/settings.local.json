@@ -1,0 +1,10 @@
+{
+  "permissions": {
+    "allow": [
+      "WebSearch",
+      "WebFetch(domain:raw.githubusercontent.com)",
+      "Bash(echo FAILED:*)",
+      "Bash(git checkout:*)"
+    ]
+  }
+}
