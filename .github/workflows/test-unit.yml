@@ -21,16 +21,14 @@ jobs:
 
       - name: bats-core をセットアップ
         shell: bash
-        run: ./scripts/install-bats.sh
+        run: bash ./scripts/install-bats.sh
 
       - name: 単体テスト
         shell: bash
         run: |
-          cd tests
-          PATH="$(pwd)/bin:$PATH" bats unit
+          bash ./tests/bin/bats tests/unit
 
       - name: フローテスト
         shell: bash
         run: |
-          cd tests
-          PATH="$(pwd)/bin:$PATH" bats flow
+          bash ./tests/bin/bats tests/flow
