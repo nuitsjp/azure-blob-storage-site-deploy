@@ -18,7 +18,7 @@ Claude Codeに順次実行させるためのタスク分解。各タスクは1�
 **ゴール**: Architecture.mdに記載のディレクトリ構成を作成し、開発の土台を整える。
 
 **成果物**:
-- リポジトリのディレクトリ構造（`scripts/lib/`, `tests/unit/`, `tests/flow/`, `tests/helpers/`, `e2e/`）
+- リポジトリのディレクトリ構造（`scripts/lib/`, `tests/unit/`, `tests/flow/`, `tests/helpers/`）
 - `.gitignore`
 - `README.md`と`Architecture.md`を配置
 - bats-coreの導入設定（gitサブモジュールまたはインストールスクリプト）
@@ -164,11 +164,11 @@ Claude Codeに順次実行させるためのタスク分解。各タスクは1�
   - `docs/index.html`, `docs/sub/page.html` — テスト用静的サイト
   - `.github/workflows/deploy.yml` — 本actionを使うワークフロー（`push`, `pull_request`トリガー）
   - `.gitignore`
-- 本体リポジトリの`e2e/`にサブモジュールとして登録
+- 開発用メタリポジトリ（`azure-blob-storage-site-deploy-dev`）配下で本体リポジトリと並行管理できる状態
 
 **完了条件**:
 - `deploy.yml`が本体リポジトリのactionを正しく参照している
-- `git submodule update --init`でE2Eリポジトリが取得できる
+- 開発用メタリポジトリで `git submodule update --init --recursive` を実行すると E2E リポジトリが取得できる
 
 ---
 
@@ -221,7 +221,7 @@ Claude Codeに順次実行させるためのタスク分解。各タスクは1�
               └── タスク7（action.yml）
                     └── タスク8（CIワークフロー）
 
-タスク7 ─── タスク9（E2Eリポジトリ初期化 + サブモジュール登録）
+タスク7 ─── タスク9（E2Eリポジトリ初期化 + 開発用メタリポジトリ連携）
               └── タスク10（verify.sh）
                     └── タスク11（E2Eオーケストレーター）
 ```
