@@ -15,11 +15,11 @@ setup() {
 }
 
 @test "deploy_main: branch_name 指定時は site_name/branch_name をプレフィックスとしてデプロイする" {
-  run deploy_main "examplestorage" "${TEST_SOURCE_DIR}" "main" "" "deploy" "" "api-docs"
+  run deploy_main "examplestorage" "${TEST_SOURCE_DIR}" "main" "" "deploy" "api-docs"
   [ "$status" -eq 0 ]
-  [ "$output" = "https://examplestorage.z22.web.core.windows.net/api-docs/main/" ]
+  [ "$output" = "https://examplestorage.z11.web.core.windows.net/api-docs/main/" ]
 
-  [ "$(mock_azure_call_count)" = "2" ]
+  [ "$(mock_azure_call_count)" = "3" ]
 
   local log
   log="$(mock_azure_read_log)"
@@ -31,11 +31,11 @@ setup() {
 }
 
 @test "deploy_main: pull_request_number 指定時は site_name/pr-<number> をプレフィックスとしてデプロイする" {
-  run deploy_main "examplestorage" "${TEST_SOURCE_DIR}" "" "42" "deploy" "" "api-docs"
+  run deploy_main "examplestorage" "${TEST_SOURCE_DIR}" "" "42" "deploy" "api-docs"
   [ "$status" -eq 0 ]
-  [ "$output" = "https://examplestorage.z22.web.core.windows.net/api-docs/pr-42/" ]
+  [ "$output" = "https://examplestorage.z11.web.core.windows.net/api-docs/pr-42/" ]
 
-  [ "$(mock_azure_call_count)" = "2" ]
+  [ "$(mock_azure_call_count)" = "3" ]
 
   local log
   log="$(mock_azure_read_log)"
@@ -59,7 +59,7 @@ setup() {
 }
 
 @test "deploy_main: バリデーションエラー時は az 呼び出しを行わない（prefix未指定）" {
-  run deploy_main "examplestorage" "${TEST_SOURCE_DIR}" "" "" "deploy" "" "api-docs"
+  run deploy_main "examplestorage" "${TEST_SOURCE_DIR}" "" "" "deploy" "api-docs"
   [ "$status" -eq 1 ]
   [[ "$output" == *"branch_name または pull_request_number"* ]]
 
@@ -68,7 +68,7 @@ setup() {
 
 @test "deploy_main: バリデーションエラー時は az 呼び出しを行わない（site_name未指定）" {
   unset GITHUB_REPOSITORY
-  run deploy_main "examplestorage" "${TEST_SOURCE_DIR}" "main" "" "deploy" "" ""
+  run deploy_main "examplestorage" "${TEST_SOURCE_DIR}" "main" "" "deploy" ""
   [ "$status" -eq 1 ]
   [[ "$output" == *"GITHUB_REPOSITORY"* ]]
 
@@ -77,11 +77,11 @@ setup() {
 
 @test "deploy_main: site_name 未指定時は GITHUB_REPOSITORY から自動導出する" {
   export GITHUB_REPOSITORY="owner/auto-repo"
-  run deploy_main "examplestorage" "${TEST_SOURCE_DIR}" "main" "" "deploy" "" ""
+  run deploy_main "examplestorage" "${TEST_SOURCE_DIR}" "main" "" "deploy" ""
   [ "$status" -eq 0 ]
-  [ "$output" = "https://examplestorage.z22.web.core.windows.net/auto-repo/main/" ]
+  [ "$output" = "https://examplestorage.z11.web.core.windows.net/auto-repo/main/" ]
 
-  [ "$(mock_azure_call_count)" = "2" ]
+  [ "$(mock_azure_call_count)" = "3" ]
 
   local log
   log="$(mock_azure_read_log)"
@@ -89,18 +89,10 @@ setup() {
   [[ "$log" == *"arg=auto-repo/main"* ]]
 }
 
-@test "deploy_main: static_website_endpoint 指定時はそのURLを出力する" {
-  run deploy_main "examplestorage" "${TEST_SOURCE_DIR}" "" "42" "deploy" "https://examplestorage.z11.web.core.windows.net" "api-docs"
-  [ "$status" -eq 0 ]
-  [ "$output" = "https://examplestorage.z11.web.core.windows.net/api-docs/pr-42/" ]
-
-  [ "$(mock_azure_call_count)" = "2" ]
-}
-
 @test "deploy_main: 異なる site_name で名前空間が分離される" {
-  run deploy_main "examplestorage" "${TEST_SOURCE_DIR}" "main" "" "deploy" "" "user-guide"
+  run deploy_main "examplestorage" "${TEST_SOURCE_DIR}" "main" "" "deploy" "user-guide"
   [ "$status" -eq 0 ]
-  [ "$output" = "https://examplestorage.z22.web.core.windows.net/user-guide/main/" ]
+  [ "$output" = "https://examplestorage.z11.web.core.windows.net/user-guide/main/" ]
 
   local log
   log="$(mock_azure_read_log)"

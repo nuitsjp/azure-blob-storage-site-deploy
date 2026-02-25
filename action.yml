@@ -18,9 +18,6 @@ inputs:
   pull_request_number:
     description: "PR番号。指定時は pr-<番号> をプレフィックスとして使用"
     required: false
-  static_website_endpoint:
-    description: "静的WebサイトのベースURL（例: https://examplestorage.z11.web.core.windows.net）"
-    required: false
   action:
     description: 実行種別（deploy または cleanup）
     required: true
@@ -43,7 +40,6 @@ runs:
         INPUT_SITE_NAME: ${{ inputs.site_name }}
         INPUT_BRANCH_NAME: ${{ inputs.branch_name }}
         INPUT_PULL_REQUEST_NUMBER: ${{ inputs.pull_request_number }}
-        INPUT_STATIC_WEBSITE_ENDPOINT: ${{ inputs.static_website_endpoint }}
         INPUT_ACTION: ${{ inputs.action }}
       run: |
         set -euo pipefail

@@ -4,44 +4,38 @@ setup() {
   source "${BATS_TEST_DIRNAME}/../../scripts/lib/prefix.sh"
 }
 
-@test "build_site_url: プレフィックス付きURLを生成し末尾スラッシュを付与する" {
-  run build_site_url "examplestorage" "main"
+@test "build_site_url: エンドポイントとプレフィックスからURLを生成し末尾スラッシュを付与する" {
+  run build_site_url "https://examplestorage.z11.web.core.windows.net" "main"
   [ "$status" -eq 0 ]
-  [ "$output" = "https://examplestorage.z22.web.core.windows.net/main/" ]
+  [ "$output" = "https://examplestorage.z11.web.core.windows.net/main/" ]
 }
 
 @test "build_site_url: prプレフィックスでも末尾スラッシュを付与する" {
-  run build_site_url "examplestorage" "pr-42"
-  [ "$status" -eq 0 ]
-  [ "$output" = "https://examplestorage.z22.web.core.windows.net/pr-42/" ]
-}
-
-@test "build_site_url: プレフィックス空文字ではルートURLを返す" {
-  run build_site_url "examplestorage" ""
-  [ "$status" -eq 0 ]
-  [ "$output" = "https://examplestorage.z22.web.core.windows.net/" ]
-}
-
-@test "build_site_url: プレフィックスがスラッシュのみでもルートURLを返す" {
-  run build_site_url "examplestorage" "/"
-  [ "$status" -eq 0 ]
-  [ "$output" = "https://examplestorage.z22.web.core.windows.net/" ]
-}
-
-@test "build_site_url: 前後スラッシュを正規化する" {
-  run build_site_url "examplestorage" "/preview/"
-  [ "$status" -eq 0 ]
-  [ "$output" = "https://examplestorage.z22.web.core.windows.net/preview/" ]
-}
-
-@test "build_site_url_from_endpoint: エンドポイントとプレフィックスからURLを生成する" {
-  run build_site_url_from_endpoint "https://examplestorage.z11.web.core.windows.net" "pr-42"
+  run build_site_url "https://examplestorage.z11.web.core.windows.net" "pr-42"
   [ "$status" -eq 0 ]
   [ "$output" = "https://examplestorage.z11.web.core.windows.net/pr-42/" ]
 }
 
-@test "build_site_url_from_endpoint: エンドポイント末尾スラッシュとプレフィックスを正規化する" {
-  run build_site_url_from_endpoint "https://examplestorage.z11.web.core.windows.net/" "/preview/"
+@test "build_site_url: プレフィックス空文字ではルートURLを返す" {
+  run build_site_url "https://examplestorage.z11.web.core.windows.net" ""
+  [ "$status" -eq 0 ]
+  [ "$output" = "https://examplestorage.z11.web.core.windows.net/" ]
+}
+
+@test "build_site_url: プレフィックスがスラッシュのみでもルートURLを返す" {
+  run build_site_url "https://examplestorage.z11.web.core.windows.net" "/"
+  [ "$status" -eq 0 ]
+  [ "$output" = "https://examplestorage.z11.web.core.windows.net/" ]
+}
+
+@test "build_site_url: 前後スラッシュを正規化する" {
+  run build_site_url "https://examplestorage.z11.web.core.windows.net" "/preview/"
+  [ "$status" -eq 0 ]
+  [ "$output" = "https://examplestorage.z11.web.core.windows.net/preview/" ]
+}
+
+@test "build_site_url: エンドポイント末尾スラッシュを正規化する" {
+  run build_site_url "https://examplestorage.z11.web.core.windows.net/" "/preview/"
   [ "$status" -eq 0 ]
   [ "$output" = "https://examplestorage.z11.web.core.windows.net/preview/" ]
 }
@@ -118,10 +112,10 @@ setup() {
   [ "$output" = "api-docs/pr-42/*" ]
 }
 
-@test "build_blob_prefix: build_site_url_from_endpoint と組み合わせて正しいURLを生成する" {
+@test "build_blob_prefix: build_site_url と組み合わせて正しいURLを生成する" {
   local prefix
   prefix="$(build_blob_prefix "api-docs" "main")"
-  run build_site_url_from_endpoint "https://myaccount.z11.web.core.windows.net" "$prefix"
+  run build_site_url "https://myaccount.z11.web.core.windows.net" "$prefix"
   [ "$status" -eq 0 ]
   [ "$output" = "https://myaccount.z11.web.core.windows.net/api-docs/main/" ]
 }
