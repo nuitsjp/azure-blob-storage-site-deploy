@@ -1,5 +1,25 @@
 #!/usr/bin/env bash
 
+azure_get_static_website_endpoint() {
+  local storage_account="${1-}"
+  local endpoint
+
+  endpoint="$(
+    az storage account show \
+      --name "$storage_account" \
+      --query primaryEndpoints.web \
+      --output tsv
+  )"
+  endpoint="${endpoint%/}"
+
+  if [[ -z "$endpoint" ]]; then
+    echo "静的Webサイトのエンドポイント取得に失敗しました: ${storage_account}" >&2
+    return 1
+  fi
+
+  printf '%s\n' "$endpoint"
+}
+
 azure_delete_prefix() {
   local storage_account="${1-}"
   local blob_pattern="${2-}"

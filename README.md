@@ -125,22 +125,20 @@ jobs:
 | `site_name` | no | サイト識別名。省略時は `GITHUB_REPOSITORY` からリポジトリ名を自動導出。複数リポジトリを同一ストレージアカウントにデプロイする場合に指定 |
 | `branch_name` | conditional | ブランチ名。`pull_request_number` 未指定時にプレフィックスとして使用 |
 | `pull_request_number` | conditional | PR 番号。指定時は `pr-<番号>` をプレフィックスとして使用（`branch_name` より優先） |
-| `static_website_endpoint` | no | 出力 `site_url` のベース URL。省略時は `https://<account>.z22.web.core.windows.net`。カスタムドメインや Azure Front Door 経由の場合に指定 |
-
 > `branch_name` と `pull_request_number` のいずれかは必須です。
 
 ### アウトプット
 
 | 名前 | 説明 |
 |------|------|
-| `site_url` | deploy 成功時の配置先 URL（末尾スラッシュ付き）。例: `https://<account>.z22.web.core.windows.net/my-docs/pr-42/` |
+| `site_url` | deploy 成功時の配置先 URL（末尾スラッシュ付き）。例: `https://<account>.<zone>.web.core.windows.net/my-docs/pr-42/` |
 
 ## URL構造
 
 デプロイされたサイトは `<endpoint>/<site_name>/<prefix>/` 配下に配置されます。プレフィックスは `branch_name` または `pr-<pull_request_number>` から自動決定されます。
 
 ```
-https://<account>.z22.web.core.windows.net/
+https://<account>.<zone>.web.core.windows.net/
 ├── api-docs/              ← site_name: api-docs（リポジトリA）
 │   ├── main/              ← branch_name: main
 │   ├── develop/           ← branch_name: develop

@@ -50,4 +50,18 @@ mock_azure_read_log() {
 
 az() {
   mock_azure_record_call "$@"
+
+  # storage account show のモック: エンドポイントを返す
+  if [[ "${1-}" == "storage" && "${2-}" == "account" && "${3-}" == "show" ]]; then
+    local account_name=""
+    local i
+    for (( i=1; i<=$#; i++ )); do
+      if [[ "${!i}" == "--name" ]]; then
+        local next=$(( i + 1 ))
+        account_name="${!next}"
+        break
+      fi
+    done
+    printf 'https://%s.z11.web.core.windows.net/\n' "${account_name}"
+  fi
 }
