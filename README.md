@@ -24,37 +24,6 @@
 
 SPA（Single Page Application）はマルチ環境構成で非対応です。Azure Blob Storage の静的 Web サイトではエラードキュメントがストレージアカウント全体で 1 つしか設定できず、プレフィックスで複数環境を分離する本アクションの構成ではサイトごとのフォールバックを実現できません。SSG（静的サイトジェネレーター）で生成した HTML であれば問題なくデプロイできます。
 
-## Azure Static Web Apps (SWA) との比較
-
-Private Endpoint を利用できる環境で、ネットワークレベルでアクセスを制限したい場合は本アクション（Blob Storage 方式）が適しています。一方、Private Endpoint が利用できない環境や、Entra ID / GitHub 等による個別ユーザー認証が必要な場合は SWA の利用を推奨します。
-
-SWA は静的サイトホスティングに優れたサービスですが、Private Endpoint によるネットワーク保護とステージング環境の併用では以下の制約があります。
-
-- **ステージング環境数**: Standard プランでも最大 10。本アクションでは無制限
-- **ネットワーク保護**: SWA のプレビュー環境は動的に発行されるドメイン（`<random>-<hash>.azurestaticapps.net`）を使用するため、Private Endpoint やカスタム認証ルールの適用が困難。Blob Storage なら Private Endpoint で容易に保護可能
-- **認証**: SWA は Entra ID / GitHub 認証を組み込みで提供（招待ユーザー 25 名まで）。Blob Storage + Private Endpoint 方式ではネットワークレベルの保護は容易だが、同一ネットワーク内での個別ユーザー認証は別途構成が必要
-
-### 比較表
-
-| 観点 | Blob Storage + 本アクション | SWA Free | SWA Standard |
-|---|---|---|---|
-| 永続環境（main, develop 等） | 無制限 | 1 | 1 |
-| PR ステージング数 | 無制限 | 最大 3 | 最大 10 |
-| Private Endpoint | ○（web + blob 2 つ必要） | × | △ ※1 |
-| 個別ユーザー認証（Entra ID / GitHub 等） | △ 別途サービスとの組み合わせで対応可 | ○ 組み込み（招待ユーザー 25 名まで） | △ ※2 |
-| SPA（React, Vue 等） | × ※3 | ○ | ○ |
-| 月額料金の目安 | 約 ¥2,340 ※4 | 無料 | 約 ¥1,440/アプリ |
-
-> ※1 Standard プランでは本番環境に Private Endpoint を設定可能ですが、プレビュー環境は動的に発行されるドメインを使用するため適用が困難です。
->
-> ※2 Standard プランでは招待ベースのロール管理（25 名まで）に加え、サーバーレス関数による無制限のロール割り当てが可能です。ただし関数によるロール管理は本番環境でのみ機能し、プレビュー環境ではドメインが動的に変わるため適用が困難です。
->
-> ※3 Azure Blob Storage の静的 Web サイトではエラードキュメントがストレージアカウント全体で 1 つしか設定できず、プレフィックスで複数環境を分離する本アクションの構成ではサイトごとのフォールバックを実現できません。
->
-> ※4 Private Endpoint（web + blob 2 つ、約 ¥1,170 × 2）の費用です。利用量に応じてストレージおよび帯域幅のコストが別途発生する場合があります。
->
-> 料金は $1 = ¥160 で換算した参考値です。
-
 ## 利用方法
 
 `branch_name` と `pull_request_number` を渡すだけで、Action内部でプレフィックスを自動解決します。呼び出し側での分岐ロジックは不要です。
@@ -94,7 +63,14 @@ jobs:
           branch_name: ${{ github.head_ref || github.ref_name }}
           pull_request_number: ${{ github.event.pull_request.number }}
 
-      # デプロイ先URL: ${{ steps.deploy.outputs.site_url }}
+      - name: Workflow Summary にデプロイ先URLを出力
+        if: success() && steps.deploy.outputs.site_url != ''
+        run: |
+          site_url="${{ steps.deploy.outputs.site_url }}"
+          {
+            echo "## デプロイ先URL"
+            echo "- URL: [${site_url}](${site_url})"
+          } >> "$GITHUB_STEP_SUMMARY"
 
   cleanup:
     if: github.event_name == 'pull_request' && github.event.action == 'closed'
@@ -156,6 +132,39 @@ https://<account>.<zone>.web.core.windows.net/
 |------|--------|----------------|------|
 | 永続ブランチ | `site_name: api-docs`, `branch_name: main` | `api-docs/main` | site_name + ブランチ名 |
 | PRステージング | `site_name: api-docs`, `pull_request_number: 42` | `api-docs/pr-42` | site_name + `pr-<PR番号>` |
+
+## Azure Static Web Apps (SWA) との比較
+
+Private Endpoint を利用できる環境で、ネットワークレベルでアクセスを制限したい場合は本アクション（Blob Storage 方式）が適しています。一方、Private Endpoint が利用できない環境や、Entra ID / GitHub 等による個別ユーザー認証が必要な場合は SWA の利用を推奨します。
+
+SWA は静的サイトホスティングに優れたサービスですが、Private Endpoint によるネットワーク保護とステージング環境の併用では以下の制約があります。
+
+- **ステージング環境数**: Standard プランでも最大 10。本アクションでは無制限
+- **ネットワーク保護**: SWA のプレビュー環境は動的に発行されるドメイン（`<random>-<hash>.azurestaticapps.net`）を使用するため、Private Endpoint やカスタム認証ルールの適用が困難。Blob Storage なら Private Endpoint で容易に保護可能
+- **認証**: SWA は Entra ID / GitHub 認証を組み込みで提供（招待ユーザー 25 名まで）。Blob Storage + Private Endpoint 方式ではネットワークレベルの保護は容易だが、同一ネットワーク内での個別ユーザー認証は別途構成が必要
+
+### 比較表
+
+| 観点 | Blob Storage + 本アクション | SWA Free | SWA Standard |
+|---|---|---|---|
+| 永続環境（main, develop 等） | 無制限 | 1 | 1 |
+| PR ステージング数 | 無制限 | 最大 3 | 最大 10 |
+| Private Endpoint | ○（web + blob 2 つ必要） | × | ○ ※1 |
+| 個別ユーザー認証（Entra ID / GitHub 等） | △ 別途サービスとの組み合わせで対応可 | ○ 組み込み（招待ユーザー 25 名まで） | ○ ※2 |
+| SPA（React, Vue 等） | × ※3 | ○ | ○ |
+| 月額料金の目安 | 約 ¥2,340 ※4 | 無料 | 約 ¥1,440 / 約 ¥2,610 ※5 |
+
+> ※1 Private Endpoint は本番環境に設定可能です。プレビュー環境は動的に発行されるドメインを使用するため、適用には注意が必要です。
+>
+> ※2 Standard プランでは招待ベースのロール管理（25 名まで）に加え、サーバーレス関数による無制限のロール割り当てが可能です。ただしカスタム認証はプレビュー環境ではドメインが動的に変わるため、適用には注意が必要です。
+>
+> ※3 Azure Blob Storage の静的 Web サイトではエラードキュメントがストレージアカウント全体で 1 つしか設定できず、プレフィックスで複数環境を分離する本アクションの構成ではサイトごとのフォールバックを実現できません。
+>
+> ※4 Private Endpoint（web + blob 2 つ、約 ¥1,170 × 2）の費用です。利用量に応じてストレージおよび帯域幅のコストが別途発生する場合があります。
+>
+> ※5 約 ¥1,440 は Standard プラン単体の料金です。Private Endpoint 利用時は約 ¥1,170 が加算されます。
+>
+> 料金は $1 = ¥160 で換算した参考値です。
 
 ## ライセンス
 
