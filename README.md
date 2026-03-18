@@ -14,9 +14,10 @@ This action focuses on publishing development documentation rather than producti
 
 - **PR Staging** — Automatically created on PR open, automatically deleted on close. No limit on the number of environments
 - **Clean Deploy** — All existing files are deleted before uploading, ensuring deletions and renames are reliably reflected
-- **Multi-Environment** — Environments are isolated by prefix (e.g., `main/`, `develop/`, `pr-42/`) and published simultaneously
+- **Multi-Environment** — Environments are isolated by prefix (e.g., `main/`, `develop/`, `pr-42/`, `release-latest/`) and published simultaneously
 - **Multi-Repository** — Namespace isolation via `site_name` aggregates sites from multiple repositories into a single storage account
 - **OIDC Authentication** — Secure authentication using Azure Entra ID federated credentials (no storage keys required)
+- **Latest Release** — Publish the latest GitHub Release to a fixed URL under `release-latest/`
 
 ## Prerequisites
 
@@ -33,6 +34,8 @@ Azure Blob Storage static websites allow only a single error document for the en
 For hosting SPAs, we recommend using Azure Static Web Apps.
 
 ## Usage
+
+### Branch and PR deployment
 
 Simply pass `branch_name` and `pull_request_number`, and the action will automatically resolve the prefix internally. No branching logic is needed on the caller's side.
 
@@ -104,6 +107,94 @@ jobs:
           pull_request_number: ${{ github.event.pull_request.number }}
 ```
 
+### GitHub Release deployment (release-latest)
+
+Specifying `is_latest_release: 'true'` deploys to the `release-latest/` prefix. Combined with the `release: published` event, the latest release is always available at a fixed URL.
+
+```yaml
+name: Deploy
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+    types: [opened, synchronize, reopened, closed]
+  release:
+    types: [published]
+
+permissions:
+  contents: read
+  id-token: write
+
+jobs:
+  deploy:
+    if: >-
+      (github.event_name == 'push' || github.event_name == 'pull_request') &&
+      (github.event_name != 'pull_request' || github.event.action != 'closed')
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: azure/login@v2
+        with:
+          client-id: ${{ secrets.AZURE_CLIENT_ID }}
+          tenant-id: ${{ secrets.AZURE_TENANT_ID }}
+          subscription-id: ${{ secrets.AZURE_SUBSCRIPTION_ID }}
+      - uses: nuitsjp/azure-blob-storage-site-deploy@v1
+        with:
+          action: deploy
+          storage_account: ${{ vars.AZURE_STORAGE_ACCOUNT }}
+          source_dir: ./dist
+          branch_name: ${{ github.head_ref || github.ref_name }}
+          pull_request_number: ${{ github.event.pull_request.number }}
+
+  deploy-release-latest:
+    if: >-
+      github.event_name == 'release' &&
+      github.event.release.prerelease == false &&
+      github.event.release.draft == false
+    runs-on: ubuntu-latest
+    environment: production        # Fixes OIDC subject to environment-based credential
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: ${{ github.event.release.tag_name }}
+      - uses: azure/login@v2
+        with:
+          client-id: ${{ secrets.AZURE_CLIENT_ID }}
+          tenant-id: ${{ secrets.AZURE_TENANT_ID }}
+          subscription-id: ${{ secrets.AZURE_SUBSCRIPTION_ID }}
+      - uses: nuitsjp/azure-blob-storage-site-deploy@v1
+        with:
+          action: deploy
+          storage_account: ${{ vars.AZURE_STORAGE_ACCOUNT }}
+          source_dir: ./dist
+          is_latest_release: 'true'
+
+  cleanup:
+    if: github.event_name == 'pull_request' && github.event.action == 'closed'
+    runs-on: ubuntu-latest
+    steps:
+      - uses: azure/login@v2
+        with:
+          client-id: ${{ secrets.AZURE_CLIENT_ID }}
+          tenant-id: ${{ secrets.AZURE_TENANT_ID }}
+          subscription-id: ${{ secrets.AZURE_SUBSCRIPTION_ID }}
+      - uses: nuitsjp/azure-blob-storage-site-deploy@v1
+        with:
+          action: cleanup
+          storage_account: ${{ vars.AZURE_STORAGE_ACCOUNT }}
+          pull_request_number: ${{ github.event.pull_request.number }}
+```
+
+> **About `environment: production`**
+>
+> With the `release` event, the OIDC token subject becomes `repo:<owner>/<repo>:ref:refs/tags/<tag-name>`. Adding a new federated credential for every tag is operationally expensive. By setting `environment: production` on the job, the subject is fixed to `repo:<owner>/<repo>:environment:production`, so a single credential registration covers all future releases.
+>
+> Azure federated credential subject to register:
+> ```
+> repo:<owner>/<repo>:environment:production
+> ```
+
 ## Parameters
 
 ### Inputs
@@ -114,10 +205,11 @@ jobs:
 | `storage_account` | **yes** | Azure Storage account name |
 | `source_dir` | deploy only | Directory to upload |
 | `site_name` | no | Site identifier. When omitted, automatically derived from the repository name in `GITHUB_REPOSITORY`. Specify this when deploying multiple repositories to the same storage account |
-| `branch_name` | conditional | Branch name. Used as the prefix when `pull_request_number` is not specified |
-| `pull_request_number` | conditional | PR number. When specified, `pr-<number>` is used as the prefix (takes priority over `branch_name`) |
+| `branch_name` | conditional | Branch name. Used as the prefix when `pull_request_number` / `is_latest_release` are not specified |
+| `pull_request_number` | conditional | PR number. When specified, `pr-<number>` is used as the prefix (highest priority) |
+| `is_latest_release` | conditional | Set to `'true'` to use `release-latest` as the prefix. Default: `'false'` |
 
-> Either `branch_name` or `pull_request_number` is required, but as shown in the usage example, specifying both enables support for both branch pushes and pull requests.
+> One of `branch_name`, `pull_request_number`, or `is_latest_release` is required. Prefix resolution priority: `pull_request_number` → `is_latest_release=true` → `branch_name`.
 
 ### Outputs
 
@@ -127,14 +219,15 @@ jobs:
 
 ## URL Structure
 
-Deployed sites are placed under `<endpoint>/<site_name>/<prefix>/`. The prefix is automatically determined from `branch_name` or `pr-<pull_request_number>`.
+Deployed sites are placed under `<endpoint>/<site_name>/<prefix>/`. The prefix is automatically determined from the input parameters.
 
 ```
 https://<account>.<zone>.web.core.windows.net/
 ├── api-docs/              ← site_name: api-docs (Repository A)
 │   ├── main/              ← branch_name: main
 │   ├── develop/           ← branch_name: develop
-│   └── pr-42/             ← pull_request_number: 42
+│   ├── pr-42/             ← pull_request_number: 42
+│   └── release-latest/    ← is_latest_release: 'true'
 └── user-guide/            ← site_name: user-guide (Repository B)
     ├── main/
     └── pr-10/
