@@ -35,81 +35,7 @@ For hosting SPAs, we recommend using Azure Static Web Apps.
 
 ## Usage
 
-### Branch and PR deployment
-
-Simply pass `branch_name` and `pull_request_number`, and the action will automatically resolve the prefix internally. No branching logic is needed on the caller's side.
-
-```yaml
-name: Deploy
-
-on:
-  push:
-    branches: [main]
-    paths:
-      - "docs/**/*.md"
-      - ".github/workflows/deploy.yml"
-  pull_request:
-    types: [opened, synchronize, reopened, closed]
-    paths:
-      - "docs/**/*.md"
-      - ".github/workflows/deploy.yml"
-
-permissions:
-  contents: read
-  id-token: write
-
-jobs:
-  deploy:
-    if: github.event.action != 'closed'
-    runs-on: ubuntu-latest
-    steps:
-      - uses: actions/checkout@v4
-
-      - uses: azure/login@v2
-        with:
-          client-id: ${{ secrets.AZURE_CLIENT_ID }}
-          tenant-id: ${{ secrets.AZURE_TENANT_ID }}
-          subscription-id: ${{ secrets.AZURE_SUBSCRIPTION_ID }}
-
-      - uses: nuitsjp/azure-blob-storage-site-deploy@v1
-        id: deploy
-        with:
-          action: deploy
-          storage_account: ${{ vars.AZURE_STORAGE_ACCOUNT }}
-          source_dir: ./dist
-          branch_name: ${{ github.head_ref || github.ref_name }}
-          pull_request_number: ${{ github.event.pull_request.number }}
-
-      # Output the deployment URL to the Workflow Summary
-      - name: Output deployment URL to Workflow Summary
-        if: success() && steps.deploy.outputs.site_url != ''
-        run: |
-          site_url="${{ steps.deploy.outputs.site_url }}"
-          {
-            echo "## Deployment URL"
-            echo "- URL: [${site_url}](${site_url})"
-          } >> "$GITHUB_STEP_SUMMARY"
-
-  cleanup:
-    if: github.event_name == 'pull_request' && github.event.action == 'closed'
-    runs-on: ubuntu-latest
-    steps:
-      - uses: azure/login@v2
-        with:
-          client-id: ${{ secrets.AZURE_CLIENT_ID }}
-          tenant-id: ${{ secrets.AZURE_TENANT_ID }}
-          subscription-id: ${{ secrets.AZURE_SUBSCRIPTION_ID }}
-
-      - uses: nuitsjp/azure-blob-storage-site-deploy@v1
-        with:
-          action: cleanup
-          storage_account: ${{ vars.AZURE_STORAGE_ACCOUNT }}
-          pull_request_number: ${{ github.event.pull_request.number }}
-```
-
-### GitHub Release deployment (release-latest)
-
-Specifying `is_latest_release: 'true'` deploys to the `release-latest/` prefix. Combined with the `release: published` event, the latest release is always available at a fixed URL.
+Simply pass `branch_name` and `pull_request_number`, and the action will automatically resolve the prefix internally. No branching logic is needed on the caller's side. GitHub Release (`is_latest_release: 'true'`) can also be included in the same workflow.
 
 ```yaml
 name: Deploy
@@ -134,12 +60,15 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
+
       - uses: azure/login@v2
         with:
           client-id: ${{ secrets.AZURE_CLIENT_ID }}
           tenant-id: ${{ secrets.AZURE_TENANT_ID }}
           subscription-id: ${{ secrets.AZURE_SUBSCRIPTION_ID }}
+
       - uses: nuitsjp/azure-blob-storage-site-deploy@v1
+        id: deploy
         with:
           action: deploy
           storage_account: ${{ vars.AZURE_STORAGE_ACCOUNT }}
@@ -147,22 +76,33 @@ jobs:
           branch_name: ${{ github.head_ref || github.ref_name }}
           pull_request_number: ${{ github.event.pull_request.number }}
 
+      - name: Output deployment URL to Workflow Summary
+        if: success() && steps.deploy.outputs.site_url != ''
+        run: |
+          site_url="${{ steps.deploy.outputs.site_url }}"
+          {
+            echo "## Deployment URL"
+            echo "- URL: [${site_url}](${site_url})"
+          } >> "$GITHUB_STEP_SUMMARY"
+
   deploy-release-latest:
     if: >-
       github.event_name == 'release' &&
       github.event.release.prerelease == false &&
       github.event.release.draft == false
     runs-on: ubuntu-latest
-    environment: production        # Fixes OIDC subject to environment-based credential
+    environment: production        # Fixes OIDC subject to environment-based credential (see below)
     steps:
       - uses: actions/checkout@v4
         with:
           ref: ${{ github.event.release.tag_name }}
+
       - uses: azure/login@v2
         with:
           client-id: ${{ secrets.AZURE_CLIENT_ID }}
           tenant-id: ${{ secrets.AZURE_TENANT_ID }}
           subscription-id: ${{ secrets.AZURE_SUBSCRIPTION_ID }}
+
       - uses: nuitsjp/azure-blob-storage-site-deploy@v1
         with:
           action: deploy
@@ -179,6 +119,7 @@ jobs:
           client-id: ${{ secrets.AZURE_CLIENT_ID }}
           tenant-id: ${{ secrets.AZURE_TENANT_ID }}
           subscription-id: ${{ secrets.AZURE_SUBSCRIPTION_ID }}
+
       - uses: nuitsjp/azure-blob-storage-site-deploy@v1
         with:
           action: cleanup
