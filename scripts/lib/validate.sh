@@ -87,14 +87,24 @@ validate_pull_request_number() {
 validate_prefix_inputs() {
   local branch_name="${1-}"
   local pull_request_number="${2-}"
+  local is_latest_release="${3-false}"
+
+  if [[ "$is_latest_release" != "true" && "$is_latest_release" != "false" ]]; then
+    echo "is_latest_release は 'true' または 'false' で指定してください。" >&2
+    return 1
+  fi
 
   if [[ -n "$pull_request_number" ]]; then
     validate_pull_request_number "$pull_request_number" || return 1
     return 0
   fi
 
+  if [[ "$is_latest_release" == "true" ]]; then
+    return 0
+  fi
+
   if [[ -z "$branch_name" ]]; then
-    echo "branch_name または pull_request_number のいずれかは必須です。" >&2
+    echo "branch_name、pull_request_number、is_latest_release のいずれかは必須です。" >&2
     return 1
   fi
 

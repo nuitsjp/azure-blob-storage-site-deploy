@@ -42,7 +42,7 @@ setup() {
 @test "cleanup_main: バリデーションエラー時は az 呼び出しを行わない（prefix未指定）" {
   run cleanup_main "examplestorage" "" "" "cleanup" "api-docs"
   [ "$status" -eq 1 ]
-  [[ "$output" == *"branch_name または pull_request_number"* ]]
+  [[ "$output" == *"いずれかは必須"* ]]
 
   [ "$(mock_azure_call_count)" = "0" ]
 }
@@ -66,4 +66,19 @@ setup() {
   local log
   log="$(mock_azure_read_log)"
   [[ "$log" == *"arg=auto-repo/pr-42/\\*"* ]]
+}
+
+@test "cleanup_main: is_latest_release=true 指定時は site_name/release-latest で delete-batch を実行する" {
+  run cleanup_main "examplestorage" "" "" "cleanup" "api-docs" "true"
+  [ "$status" -eq 0 ]
+  [ "$output" = "" ]
+
+  [ "$(mock_azure_call_count)" = "1" ]
+
+  local log
+  log="$(mock_azure_read_log)"
+  [[ "$log" == *"arg=delete-batch"* ]]
+  [[ "$log" != *"arg=upload-batch"* ]]
+  [[ "$log" == *"arg=--pattern"* ]]
+  [[ "$log" == *"arg=api-docs/release-latest/\\*"* ]]
 }

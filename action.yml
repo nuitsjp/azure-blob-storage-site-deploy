@@ -18,6 +18,10 @@ inputs:
   pull_request_number:
     description: "PR番号。指定時は pr-<番号> をプレフィックスとして使用"
     required: false
+  is_latest_release:
+    description: "'true' を指定すると release-latest プレフィックスとして配置"
+    required: false
+    default: 'false'
   action:
     description: 実行種別（deploy または cleanup）
     required: true
@@ -40,6 +44,7 @@ runs:
         INPUT_SITE_NAME: ${{ inputs.site_name }}
         INPUT_BRANCH_NAME: ${{ inputs.branch_name }}
         INPUT_PULL_REQUEST_NUMBER: ${{ inputs.pull_request_number }}
+        INPUT_IS_LATEST_RELEASE: ${{ inputs.is_latest_release }}
         INPUT_ACTION: ${{ inputs.action }}
       run: |
         set -euo pipefail
@@ -66,6 +71,7 @@ runs:
         INPUT_SITE_NAME: ${{ inputs.site_name }}
         INPUT_BRANCH_NAME: ${{ inputs.branch_name }}
         INPUT_PULL_REQUEST_NUMBER: ${{ inputs.pull_request_number }}
+        INPUT_IS_LATEST_RELEASE: ${{ inputs.is_latest_release }}
         INPUT_ACTION: ${{ inputs.action }}
       run: |
         set -euo pipefail

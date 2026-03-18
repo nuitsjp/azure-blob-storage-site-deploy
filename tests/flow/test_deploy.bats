@@ -61,7 +61,7 @@ setup() {
 @test "deploy_main: バリデーションエラー時は az 呼び出しを行わない（prefix未指定）" {
   run deploy_main "examplestorage" "${TEST_SOURCE_DIR}" "" "" "deploy" "api-docs"
   [ "$status" -eq 1 ]
-  [[ "$output" == *"branch_name または pull_request_number"* ]]
+  [[ "$output" == *"いずれかは必須"* ]]
 
   [ "$(mock_azure_call_count)" = "0" ]
 }
@@ -98,4 +98,27 @@ setup() {
   log="$(mock_azure_read_log)"
   [[ "$log" == *"arg=user-guide/main/\\*"* ]]
   [[ "$log" == *"arg=user-guide/main"* ]]
+}
+
+@test "deploy_main: is_latest_release=true 指定時は site_name/release-latest をプレフィックスとしてデプロイする" {
+  run deploy_main "examplestorage" "${TEST_SOURCE_DIR}" "" "" "deploy" "api-docs" "true"
+  [ "$status" -eq 0 ]
+  [ "$output" = "https://examplestorage.z11.web.core.windows.net/api-docs/release-latest/" ]
+
+  [ "$(mock_azure_call_count)" = "3" ]
+
+  local log
+  log="$(mock_azure_read_log)"
+  [[ "$log" == *"arg=--pattern"* ]]
+  [[ "$log" == *"arg=api-docs/release-latest/\\*"* ]]
+  [[ "$log" == *"arg=--destination-path"* ]]
+  [[ "$log" == *"arg=api-docs/release-latest"* ]]
+}
+
+@test "deploy_main: バリデーションエラー時は az 呼び出しを行わない（is_latest_release=invalid）" {
+  run deploy_main "examplestorage" "${TEST_SOURCE_DIR}" "" "" "deploy" "api-docs" "invalid"
+  [ "$status" -eq 1 ]
+  [[ "$output" == *"'true' または 'false'"* ]]
+
+  [ "$(mock_azure_call_count)" = "0" ]
 }

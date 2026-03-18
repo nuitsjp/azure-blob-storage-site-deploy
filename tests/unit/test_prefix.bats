@@ -90,6 +90,24 @@ setup() {
   [ "$output" = "pr-42" ]
 }
 
+@test "resolve_target_prefix: is_latest_release=true 時は release-latest を返す" {
+  run resolve_target_prefix "" "" "true"
+  [ "$status" -eq 0 ]
+  [ "$output" = "release-latest" ]
+}
+
+@test "resolve_target_prefix: pull_request_number が優先され is_latest_release=true より pr-<number> を返す" {
+  run resolve_target_prefix "" "42" "true"
+  [ "$status" -eq 0 ]
+  [ "$output" = "pr-42" ]
+}
+
+@test "resolve_target_prefix: is_latest_release=false 時は branch_name を返す" {
+  run resolve_target_prefix "main" "" "false"
+  [ "$status" -eq 0 ]
+  [ "$output" = "main" ]
+}
+
 # --- build_blob_prefix ---
 
 @test "build_blob_prefix: site_name と target_prefix を結合する" {

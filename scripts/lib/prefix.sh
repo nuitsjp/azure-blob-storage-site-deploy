@@ -10,9 +10,15 @@ build_blob_prefix() {
 resolve_target_prefix() {
   local branch_name="${1-}"
   local pull_request_number="${2-}"
+  local is_latest_release="${3-false}"
 
   if [[ -n "$pull_request_number" ]]; then
     printf 'pr-%s\n' "$pull_request_number"
+    return 0
+  fi
+
+  if [[ "$is_latest_release" == "true" ]]; then
+    printf 'release-latest\n'
     return 0
   fi
 
