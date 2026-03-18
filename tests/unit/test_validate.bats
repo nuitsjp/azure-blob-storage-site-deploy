@@ -154,7 +154,7 @@ setup() {
 @test "validate_prefix_inputs: 両方空で失敗する" {
   run validate_prefix_inputs "" ""
   [ "$status" -eq 1 ]
-  [[ "$output" == *"branch_name または pull_request_number"* ]]
+  [[ "$output" == *"いずれかは必須"* ]]
 }
 
 @test "validate_prefix_inputs: 不正な pull_request_number で失敗する" {
@@ -167,6 +167,28 @@ setup() {
   run validate_prefix_inputs "feature/add-docs" ""
   [ "$status" -eq 1 ]
   [[ "$output" == *"ハイフン"* ]]
+}
+
+@test "validate_prefix_inputs: is_latest_release=true のみで成功する" {
+  run validate_prefix_inputs "" "" "true"
+  [ "$status" -eq 0 ]
+}
+
+@test "validate_prefix_inputs: is_latest_release=false かつ全て空で失敗する" {
+  run validate_prefix_inputs "" "" "false"
+  [ "$status" -eq 1 ]
+  [[ "$output" == *"いずれかは必須"* ]]
+}
+
+@test "validate_prefix_inputs: is_latest_release が true でも false でもない値で失敗する" {
+  run validate_prefix_inputs "" "" "invalid"
+  [ "$status" -eq 1 ]
+  [[ "$output" == *"'true' または 'false'"* ]]
+}
+
+@test "validate_prefix_inputs: pull_request_number が is_latest_release=true より優先される" {
+  run validate_prefix_inputs "" "42" "true"
+  [ "$status" -eq 0 ]
 }
 
 # --- validate_site_name ---

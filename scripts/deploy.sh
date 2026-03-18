@@ -22,6 +22,7 @@ deploy_main() {
   local pull_request_number="${4-${INPUT_PULL_REQUEST_NUMBER-}}"
   local action="${5-${INPUT_ACTION-deploy}}"
   local site_name="${6-${INPUT_SITE_NAME-}}"
+  local is_latest_release="${7-${INPUT_IS_LATEST_RELEASE-false}}"
   local target_prefix
   local blob_prefix
   local blob_pattern
@@ -33,9 +34,9 @@ deploy_main() {
   validate_source_dir "$action" "$source_dir" || return 1
   site_name="$(resolve_site_name "$site_name")" || return 1
   validate_site_name "$site_name" || return 1
-  validate_prefix_inputs "$branch_name" "$pull_request_number" || return 1
+  validate_prefix_inputs "$branch_name" "$pull_request_number" "$is_latest_release" || return 1
 
-  target_prefix="$(resolve_target_prefix "$branch_name" "$pull_request_number")" || return 1
+  target_prefix="$(resolve_target_prefix "$branch_name" "$pull_request_number" "$is_latest_release")" || return 1
   blob_prefix="$(build_blob_prefix "$site_name" "$target_prefix")" || return 1
 
   blob_pattern="$(build_blob_pattern "$blob_prefix")" || return 1
