@@ -18,6 +18,7 @@ GitHub Actionsで、Azure Blob Storageの静的Webサイト機能にコンテン
 - **マルチリポジトリ** — `site_name` による名前空間分離で、複数リポジトリのサイトを単一ストレージアカウントに集約
 - **OIDC認証** — Azure Entra IDのフェデレーション資格情報による安全な認証（ストレージキー不要）
 - **リリース公開** — GitHub Release（latest）の公開をトリガーに `release-latest/` へ固定URLでデプロイ
+- **Fork PR対応** — Forkリポジトリからの PR でも `pull_request_target` パターンでステージングを自動公開可能（[後述](#fork-pr-への対応)）
 
 ## 前提条件
 
@@ -135,6 +136,104 @@ jobs:
 > ```
 > repo:<owner>/<repo>:environment:production
 > ```
+
+## Fork PR への対応
+
+外部コントリビューターや fork リポジトリからの PR でもステージング環境を自動公開したい場合、`on: pull_request` のままでは fork PR に `secrets` が一切露出しないため `azure/login` で失敗します。これを解消するには、`on: pull_request_target` で起動し、**fork のコードを実行せず静的コンテンツのみ取り込む**パターンを使ってください。
+
+### 設計の要点
+
+- `pull_request_target` で起動 → secrets / OIDC は upstream のコンテキストで利用可能
+- `actions/checkout@v4`（無印）で base ブランチをチェックアウト = 信頼境界
+- Fork PR の時のみ `actions/checkout@v4` で fork の `head.sha` を別パス（例: `__fork__/`）にチェックアウト
+  - `persist-credentials: false` を必ず指定し、fork 由来のクレデンシャル汚染を遮断
+- `source_dir` を fork 側のディレクトリに切り替えてアップロード
+- `.github/` / `action.yml` / scripts は base 側のものだけが動く（任意コード実行リスクなし）
+- 発行される OIDC トークンの subject は upstream 参照（`repo:<owner>/<repo>:pull_request`）のため、既存の federated credential がそのまま機能
+
+### 例
+
+```yaml
+name: Deploy
+
+on:
+  push:
+    branches: [main]
+  pull_request_target:
+    types: [opened, synchronize, reopened, closed]
+  release:
+    types: [published]
+
+permissions:
+  contents: read
+  id-token: write
+  pull-requests: write   # PR コメントを投稿する場合
+
+jobs:
+  deploy:
+    if: >-
+      (github.event_name == 'push' || github.event_name == 'pull_request_target') &&
+      (github.event_name != 'pull_request_target' || github.event.action != 'closed')
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout (base = 信頼境界)
+        uses: actions/checkout@v4
+
+      - name: Checkout fork docs（fork PR 時のみ、コードは実行しない）
+        if: github.event_name == 'pull_request_target'
+        uses: actions/checkout@v4
+        with:
+          repository: ${{ github.event.pull_request.head.repo.full_name }}
+          ref: ${{ github.event.pull_request.head.sha }}
+          path: __fork__
+          persist-credentials: false
+
+      - uses: azure/login@v2
+        with:
+          client-id: ${{ secrets.AZURE_CLIENT_ID }}
+          tenant-id: ${{ secrets.AZURE_TENANT_ID }}
+          subscription-id: ${{ secrets.AZURE_SUBSCRIPTION_ID }}
+
+      - id: src
+        shell: bash
+        run: |
+          if [[ "${GITHUB_EVENT_NAME}" == "pull_request_target" ]]; then
+            echo "dir=__fork__/dist" >> "$GITHUB_OUTPUT"
+          else
+            echo "dir=./dist" >> "$GITHUB_OUTPUT"
+          fi
+
+      - uses: nuitsjp/azure-blob-storage-site-deploy@v1
+        id: deploy
+        with:
+          action: deploy
+          storage_account: ${{ vars.AZURE_STORAGE_ACCOUNT }}
+          source_dir: ${{ steps.src.outputs.dir }}
+          branch_name: ${{ github.event.pull_request.head.ref || github.ref_name }}
+          pull_request_number: ${{ github.event.pull_request.number }}
+
+  cleanup:
+    if: github.event_name == 'pull_request_target' && github.event.action == 'closed'
+    runs-on: ubuntu-latest
+    steps:
+      - uses: azure/login@v2
+        with:
+          client-id: ${{ secrets.AZURE_CLIENT_ID }}
+          tenant-id: ${{ secrets.AZURE_TENANT_ID }}
+          subscription-id: ${{ secrets.AZURE_SUBSCRIPTION_ID }}
+
+      - uses: nuitsjp/azure-blob-storage-site-deploy@v1
+        with:
+          action: cleanup
+          storage_account: ${{ vars.AZURE_STORAGE_ACCOUNT }}
+          pull_request_number: ${{ github.event.pull_request.number }}
+```
+
+### セキュリティ上の注意
+
+- `pull_request_target` を使う際は **絶対に fork 側のコードを実行しないこと**（`npm install`、`bash <fork-script>` 等は厳禁。実行すると upstream の secrets で任意コード実行が成立する）
+- 上記パターンは静的ファイルのアップロードのみのため任意コード実行リスクは無いが、配信される HTML/JS には XSS のリスクが残る。**公開ステージングである前提で PR レビュー時に内容を確認**すること
+- 外部コントリビューターを広く受け入れる OSS では、`environment` の required reviewers での手動承認ゲート、または `author_association` チェック（`MEMBER` / `OWNER` / `COLLABORATOR` のみ自動実行）の追加を検討
 
 ## パラメーター
 

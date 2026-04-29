@@ -18,6 +18,7 @@ This action focuses on publishing development documentation rather than producti
 - **Multi-Repository** — Namespace isolation via `site_name` aggregates sites from multiple repositories into a single storage account
 - **OIDC Authentication** — Secure authentication using Azure Entra ID federated credentials (no storage keys required)
 - **Latest Release** — Publish the latest GitHub Release to a fixed URL under `release-latest/`
+- **Fork PR support** — PRs from forked repositories can also publish staging environments via the `pull_request_target` pattern (see [below](#fork-pr-support))
 
 ## Prerequisites
 
@@ -135,6 +136,104 @@ jobs:
 > ```
 > repo:<owner>/<repo>:environment:production
 > ```
+
+## Fork PR support
+
+If you want PRs from external contributors or forked repositories to also publish staging environments automatically, a plain `on: pull_request` will fail at `azure/login` because GitHub does not expose any `secrets` to fork PRs. To address this, use `on: pull_request_target` and **only take static content from the fork — never execute fork-side code**.
+
+### Design points
+
+- Triggered by `pull_request_target` → secrets / OIDC become available in the upstream context
+- `actions/checkout@v4` (no inputs) checks out the base branch as the trust boundary
+- Only on fork PRs, an additional `actions/checkout@v4` checks out the fork's `head.sha` into a separate path (e.g., `__fork__/`)
+  - Always specify `persist-credentials: false` to prevent credential leakage from the fork-side checkout
+- Switch `source_dir` to the fork's directory for the upload
+- `.github/`, `action.yml`, and scripts run only from the base side (no arbitrary code execution risk)
+- The OIDC token's subject is scoped to the upstream repository (`repo:<owner>/<repo>:pull_request`), so existing federated credentials work as-is
+
+### Example
+
+```yaml
+name: Deploy
+
+on:
+  push:
+    branches: [main]
+  pull_request_target:
+    types: [opened, synchronize, reopened, closed]
+  release:
+    types: [published]
+
+permissions:
+  contents: read
+  id-token: write
+  pull-requests: write   # If you post PR comments
+
+jobs:
+  deploy:
+    if: >-
+      (github.event_name == 'push' || github.event_name == 'pull_request_target') &&
+      (github.event_name != 'pull_request_target' || github.event.action != 'closed')
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout (base = trust boundary)
+        uses: actions/checkout@v4
+
+      - name: Checkout fork docs (fork PR only, code is never executed)
+        if: github.event_name == 'pull_request_target'
+        uses: actions/checkout@v4
+        with:
+          repository: ${{ github.event.pull_request.head.repo.full_name }}
+          ref: ${{ github.event.pull_request.head.sha }}
+          path: __fork__
+          persist-credentials: false
+
+      - uses: azure/login@v2
+        with:
+          client-id: ${{ secrets.AZURE_CLIENT_ID }}
+          tenant-id: ${{ secrets.AZURE_TENANT_ID }}
+          subscription-id: ${{ secrets.AZURE_SUBSCRIPTION_ID }}
+
+      - id: src
+        shell: bash
+        run: |
+          if [[ "${GITHUB_EVENT_NAME}" == "pull_request_target" ]]; then
+            echo "dir=__fork__/dist" >> "$GITHUB_OUTPUT"
+          else
+            echo "dir=./dist" >> "$GITHUB_OUTPUT"
+          fi
+
+      - uses: nuitsjp/azure-blob-storage-site-deploy@v1
+        id: deploy
+        with:
+          action: deploy
+          storage_account: ${{ vars.AZURE_STORAGE_ACCOUNT }}
+          source_dir: ${{ steps.src.outputs.dir }}
+          branch_name: ${{ github.event.pull_request.head.ref || github.ref_name }}
+          pull_request_number: ${{ github.event.pull_request.number }}
+
+  cleanup:
+    if: github.event_name == 'pull_request_target' && github.event.action == 'closed'
+    runs-on: ubuntu-latest
+    steps:
+      - uses: azure/login@v2
+        with:
+          client-id: ${{ secrets.AZURE_CLIENT_ID }}
+          tenant-id: ${{ secrets.AZURE_TENANT_ID }}
+          subscription-id: ${{ secrets.AZURE_SUBSCRIPTION_ID }}
+
+      - uses: nuitsjp/azure-blob-storage-site-deploy@v1
+        with:
+          action: cleanup
+          storage_account: ${{ vars.AZURE_STORAGE_ACCOUNT }}
+          pull_request_number: ${{ github.event.pull_request.number }}
+```
+
+### Security notes
+
+- When using `pull_request_target`, **never execute code from the fork side** (running `npm install`, `bash <fork-script>`, etc. is strictly prohibited — doing so allows arbitrary code execution under the upstream's secrets)
+- The pattern above only uploads static files, so there is no arbitrary code execution risk; however, served HTML/JS can still carry XSS risks. **Review the content during PR review**, on the assumption that the staging environment is publicly accessible
+- For OSS projects that broadly accept external contributors, consider adding manual approval gates via `environment` required reviewers, or an `author_association` check (auto-run only for `MEMBER` / `OWNER` / `COLLABORATOR`)
 
 ## Parameters
 
